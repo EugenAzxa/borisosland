@@ -100,11 +100,19 @@ em{font-style:normal;color:var(--lime)}
   .fly__card .row{margin-top:16px}
   .fly__card .btn{height:46px;padding:0 20px;font-size:15px}
   .fly__hud{bottom:auto;top:84px}
+}
+/* маленькие телефоны: карточка без абзаца, кнопки в одну строку */
+@media (max-width:760px) and (max-height:800px), (max-width:370px){
+  .fly__card{padding:18px}
+  .fly__card>p:not(.eyebrow){display:none}
+  .fly__card h2{font-size:23px;margin-bottom:0}
+  .fly__card .row{gap:8px;flex-wrap:nowrap}
+  .fly__card .btn{height:44px;padding:0 15px;font-size:14px}
   .fly__note{bottom:auto;top:90px}
 }
 
 /* ===== секции ===== */
-.sec{max-width:1240px;margin:0 auto;padding:clamp(72px,11vw,140px) clamp(16px,4vw,48px) 0}
+.sec{scroll-margin-top:64px;max-width:1240px;margin:0 auto;padding:clamp(72px,11vw,140px) clamp(16px,4vw,48px) 0}
 .sec__h{display:flex;align-items:baseline;gap:18px;padding-bottom:18px;margin-bottom:28px;border-bottom:1px solid var(--line)}
 .sec__n{font-family:var(--fd);font-size:14px;color:var(--lime)}
 .sec__h h2{font-size:clamp(30px,4.6vw,56px)}
@@ -132,7 +140,8 @@ em{font-style:normal;color:var(--lime)}
 .plan{display:grid;grid-template-columns:1fr 320px;gap:18px;align-items:stretch}
 .plan__map{position:relative;border-radius:var(--r);overflow:hidden;box-shadow:0 0 0 1px var(--line)}
 .plan__map img{width:100%;height:auto}
-.plan__map>svg{position:absolute;inset:0;width:100%;height:100%}
+.plan__zoom{position:relative}
+.plan__zoom>svg{position:absolute;inset:0;width:100%;height:100%}
 .plan__map .pp{cursor:pointer;outline:none}
 .plan__map .pp rect{stroke-width:3;transition:fill .2s}
 .plan__map .pp--free rect{fill:rgba(207,226,122,.28);stroke:var(--lime)}
@@ -157,7 +166,9 @@ em{font-style:normal;color:var(--lime)}
 .lg--tp{background:#7d8590;border-radius:2px;width:12px;height:12px;margin:0 3px}
 @media (max-width:980px){.plan{grid-template-columns:1fr}.plan__road{display:none}}
 @media (max-width:640px){
-  .plan__map .pp .t1{font-size:32px}
+  /* на телефоне генплан приближен к участкам, трасса уходит за край */
+  .plan__zoom{width:150%;margin-left:-30%}
+  .plan__map .pp .t1{font-size:30px}
   .plan__map .pp .t2{display:none}
   .plan__map .pp--sold .t1{font-size:0}
 }
@@ -189,7 +200,7 @@ em{font-style:normal;color:var(--lime)}
 .contact{display:grid;grid-template-columns:1.4fr 1fr;gap:48px;align-items:center;padding-bottom:clamp(72px,10vw,120px)}
 .contact h2{font-size:clamp(34px,5vw,64px);margin-bottom:18px}
 .contact p{color:var(--mute);max-width:560px}
-.contact__r img{width:min(260px,60vw);margin:0 auto;border-radius:50%;box-shadow:0 0 0 1px rgba(207,226,122,.3),0 30px 90px rgba(207,226,122,.12)}
+.contact__r img{width:min(260px,60vw);height:auto;margin:0 auto;border-radius:50%;box-shadow:0 0 0 1px rgba(207,226,122,.3),0 30px 90px rgba(207,226,122,.12)}
 @media (max-width:800px){.contact{grid-template-columns:1fr}.contact__r{order:-1}.contact__r img{margin:0;width:140px}}
 
 .foot{border-top:1px solid var(--line);padding:28px clamp(16px,4vw,48px) 40px;max-width:1240px;margin:0 auto;font-size:14px;color:var(--mute)}

@@ -7,7 +7,7 @@
     phone: '',               // например '+7 921 000-00-00' - появится во всех кнопках «Позвонить»
     film: {
       d: { dir: 'assets/film/d1/', count: 139, crop: [0, 1] },      // кадры для компьютера, весь кадр 16:9
-      m: { dir: 'assets/film/m1/', count: 139, crop: [.3, .4] }     // телефон: центральные 40% ширины кадра
+      m: { dir: 'assets/film/m2/', count: 139, crop: [.1, .8] }      // телефон: центральные 80% ширины кадра
     },
     still: 'assets/img/plan.webp' // финальный кадр сверху, в координатах 1400 x 791
   };
@@ -129,7 +129,7 @@
   /* ---------- пролёт ---------- */
   var fly = $('#fly'), stage = $('.fly__stage'), cv = $('#flyCv'), ctx = cv.getContext('2d');
   var intro = $('#flyIntro'), land = $('#flyLand'), card = $('#flyCard'), hint = $('#flyHint');
-  var altEl = $('#flyAlt'), bar = $('#flyBar'), hud = $('.fly__hud');
+  var altEl = $('#flyAlt'), bar = $('#flyBar'), hud = $('.fly__hud'), note = $('.fly__note');
   var mobile = window.innerWidth <= 760 && window.innerHeight > window.innerWidth;
   var film = mobile ? CONFIG.film.m : CONFIG.film.d;
   var N = film.count;
@@ -168,7 +168,7 @@
   roof.style.strokeDasharray = roofLen; roof.style.strokeDashoffset = roofLen;
   var wins = land.querySelectorAll('.land-win rect');
   var nameT = land.querySelector('.draw-t'), sub = land.querySelector('.land-sub');
-  nameT.style.strokeDasharray = 420; nameT.style.strokeDashoffset = 420;
+  nameT.style.strokeDasharray = '1200 1200'; nameT.style.strokeDashoffset = 1200;
 
   var W = 0, H = 0, dpr = 1, need = true, P = 0;
   function size() {
@@ -180,15 +180,19 @@
 
   // кадр 16:9 «на весь экран» во время снижения и итоговая раскладка в конце
   var IA = 1400 / 791;
+  function portrait() { return W < 761 && H > W; }
   function layout(t) {
     var cover = Math.max(W / 1400, H / 791);
     var s0 = cover, cx0 = W / 2 - 700 * s0, cy0 = H / 2 - 395.5 * s0;
     var s1, cx1, cy1;
-    if (W < 761 && H > W) {
-      // телефон: посёлок целиком по ширине, сверху над карточкой
+    if (portrait()) {
+      // телефон: кадр расширяется во время снижения (масштаб по логарифму, чтобы посёлок
+      // на экране всё время рос), к концу посёлок целиком по ширине, над карточкой
       s1 = W / 960;
-      cx1 = W / 2 - 735 * s1;
-      cy1 = H * 0.34 - 400 * s1;
+      var k = Math.pow(s1 / s0, t), sc = s0 * k;
+      var u = ease(seg(P, .88, .95));                             // поднимаем кадр, когда выезжает карточка
+      var fx = 700 + 35 * t, fy = 395.5 + 4.5 * t, Y = H / 2 + (H * 0.34 - H / 2) * u;
+      return { s: sc, x: W / 2 - fx * sc, y: Y - fy * sc };
     } else {
       // компьютер: посёлок слева, справа место под карточку
       // компьютер: весь посёлок вместе с трассой слева, справа место под карточку
@@ -232,7 +236,7 @@
     need = false;
     var p = P;
 
-    var tMove = seg(p, .7, .8);
+    var tMove = portrait() ? seg(p, .2, .66) : seg(p, .7, .8);
     var L = layout(tMove);
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -257,12 +261,13 @@
 
     land.style.opacity = seg(p, .7, .73);
     hud.style.opacity = 1 - seg(p, .68, .74);
+    note.style.opacity = portrait() ? 1 - seg(p, .68, .74) : 1;
     var r = seg(p, .74, .84);
     roof.style.strokeDashoffset = roofLen * (1 - ease(r));
     var w = seg(p, .82, .85);
     for (var i = 0; i < wins.length; i++) wins[i].style.opacity = w;
     var n = seg(p, .76, .88);
-    nameT.style.strokeDashoffset = 420 * (1 - n);
+    nameT.style.strokeDashoffset = 1200 * (1 - n);
     nameT.style.fill = 'rgba(207,226,122,' + (seg(p, .85, .9) * .95) + ')';
     nameT.style.strokeOpacity = 1 - seg(p, .88, .92) * .6;
     sub.style.opacity = seg(p, .88, .91);
@@ -283,7 +288,7 @@
     altEl.textContent = alt.toLocaleString('ru-RU').replace(/ /g, ' ') + ' м';
     bar.style.width = (p * 100) + '%';
 
-    card.classList.toggle('is-on', p > .93);
+    card.classList.toggle('is-on', p > (portrait() ? .9 : .93));
   }
 
   function onScroll() {
