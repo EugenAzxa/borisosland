@@ -1,0 +1,14 @@
+{
+  "name": "invest47",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  },
+  "dependencies": {
+    "@vercel/blob": "latest"
+  },
+  "devDependencies": {
+    "marked": "latest"
+  }
+}
