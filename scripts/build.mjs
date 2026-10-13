@@ -4,8 +4,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { marked } from 'marked';
-import { page, crumbs, esc, footer, ORG_LD, SITE } from '../lib/site.js';
-import { KINDS, DISTRICTS, OWN, slugify } from '../lib/listings.js';
+import { page, crumbs, esc, footer, ORG_LD, SITE, callBlock } from '../lib/site.js';
+import { OWN, slugify } from '../lib/listings.js';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const OUT = path.join(ROOT, 'public');
@@ -116,103 +116,46 @@ ${more.length ? `<section class="wrap"><header class="sec__h"><h2>Ещё в бл
 fs.writeFileSync(path.join(ROOT, 'lib/blog-index.js'), '// создаётся scripts/build.mjs, не править руками\nexport default ' +
   JSON.stringify(posts.map((p) => ({ slug: p.slug, title: p.title, date: p.date })), null, 1) + ';\n');
 
-/* ---------- форма «Продать участок» ---------- */
+/* ---------- «Продать участок»: только через звонок, сами посетители участки не добавляют ---------- */
 {
-  const c = crumbs([['/vitrina', 'Витрина'], [null, 'Разместить участок']]);
-  const opt = (o) => Object.entries(o).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+  const c = crumbs([['/vitrina', 'Витрина'], [null, 'Продать участок']]);
   write('vitrina/podat.html', page({
-    title: 'Продать земельный участок через витрину Инвест 47 - подать заявку',
-    description: 'Разместите свой земельный участок в Ленинградской области на витрине Инвест 47. Проверяем документы, ВРИ, подъезд и коммуникации и публикуем только проверенные участки.',
+    title: 'Продать земельный участок через витрину Инвест 47',
+    description: 'Хотите продать участок в Ленинградской области через витрину Инвест 47? Позвоните: обсудим участок и условия, проверим документы, ВРИ, подъезд и коммуникации и опубликуем.',
     path: '/vitrina/podat', active: 'podat', jsonld: [c.ld],
     body: `<section class="wrap podat">
   ${c.html}
   <div class="podat__grid">
     <div class="podat__intro">
       <p class="eyebrow">Витрина Инвест 47</p>
-      <h1 class="h1">Разместить свой участок</h1>
-      <p class="lead">Заполните заявку - мы проверим участок и документы. Если всё подтвердится, опубликуем его на витрине с отметкой «Проверено Инвест 47», а обращения покупателей передадим вам.</p>
+      <h1 class="h1">Продать участок через витрину</h1>
+      <p class="lead">На витрине только участки, которые мы согласовали с владельцем и проверили сами. Поэтому разместить участок самостоятельно нельзя: сначала позвоните нам.</p>
+      <div class="row"><a class="btn" href="${SITE.tel}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>Позвонить ${SITE.phone}</a></div>
       <ol class="podat__steps">
-        <li><b>Проверяем</b>выписку ЕГРН и собственника, категорию и ВРИ, границы, подъезд, коммуникации.</li>
-        <li><b>Публикуем</b>только то, что подтвердилось. Ваш телефон на сайте не показываем.</li>
-        <li><b>Передаём покупателей</b>и помогаем довести сделку. Условия обсудим после проверки участка.</li>
+        <li><b>Звонок</b>Рассказываете об участке, обсуждаем, подходит ли он для витрины и на каких условиях.</li>
+        <li><b>Проверка</b>Смотрим выписку ЕГРН и собственника, категорию и ВРИ, границы, подъезд и коммуникации.</li>
+        <li><b>Публикация</b>Сами готовим карточку участка и согласуем её с вами. Ваш телефон на сайте не показываем.</li>
+        <li><b>Покупатели</b>Обращения приходят к нам, мы передаём их вам и помогаем довести сделку.</li>
       </ol>
+      <h2 class="h2" style="margin-top:36px">Что подготовить к звонку</h2>
+      <ul class="checks podat__list">
+        <li>Кадастровый номер - без него проверку не начать</li>
+        <li>Где участок: населённый пункт, шоссе и километр</li>
+        <li>Площадь, категорию земли и ВРИ</li>
+        <li>Цену, за которую готовы продать</li>
+        <li>Что с электричеством, газом, водой и подъездом</li>
+        <li>Фото участка и подъезда - пришлёте после разговора</li>
+      </ul>
       <p class="podat__more">Подробнее о проверке - в статье <a href="/blog/kak-prodat-uchastok-cherez-vitrinu">«Как продать участок через витрину»</a>.</p>
     </div>
-    <form class="form form--big" data-form="listing" novalidate>
-      <fieldset><legend>Участок</legend>
-        <div class="f2">
-          <label class="f"><span>Категория земли</span><select name="kind" required><option value="">Выберите</option>${opt(KINDS)}</select></label>
-          <label class="f"><span>ВРИ <i>если знаете</i></span><input name="vri" maxlength="200" placeholder="Например, склады 6.9"></label>
-        </div>
-        <div class="f3">
-          <label class="f"><span>Площадь, сот.</span><input name="area" inputmode="decimal" required placeholder="20"></label>
-          <label class="f"><span>Цена, ₽</span><input name="price" inputmode="numeric" required placeholder="5 000 000"></label>
-          <label class="f"><span>До КАД, км <i>примерно</i></span><input name="distKad" inputmode="decimal"></label>
-        </div>
-        <div class="f2">
-          <label class="f"><span>Район</span><select name="district" required><option value="">Выберите</option>${DISTRICTS.map((d) => `<option>${d}</option>`).join('')}</select></label>
-          <label class="f"><span>Где находится</span><input name="place" maxlength="200" required placeholder="Посёлок, шоссе и км, ориентир"></label>
-        </div>
-        <label class="f"><span>Кадастровый номер <i>ускорит проверку</i></span><input name="kn" maxlength="200" placeholder="47:07:0000000:000"></label>
-      </fieldset>
-      <fieldset><legend>Коммуникации и подъезд</legend>
-        <div class="f2">
-          <label class="f"><span>Электричество</span><input name="power" maxlength="120" placeholder="Например, 15 кВт подключено"></label>
-          <label class="f"><span>Газ</span><input name="gas" maxlength="120" placeholder="Есть / по границе / нет"></label>
-          <label class="f"><span>Вода</span><input name="water" maxlength="120" placeholder="Скважина, центральная"></label>
-          <label class="f"><span>Канализация</span><input name="sewer" maxlength="120"></label>
-        </div>
-        <label class="f"><span>Подъезд</span><input name="road" maxlength="160" placeholder="Асфальт до участка, круглый год"></label>
-        <label class="f"><span>Описание</span><textarea name="description" rows="5" maxlength="4000" placeholder="Что рядом, рельеф, что уже есть на участке, почему продаёте"></textarea></label>
-      </fieldset>
-      <fieldset><legend>Фото</legend>
-        <div class="ph">
-          <label class="ph__add"><input type="file" accept="image/*" multiple><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Добавить фото</span></label>
-          <ul class="ph__list"></ul>
-        </div>
-        <p class="ph__n">До 10 фото</p>
-      </fieldset>
-      <fieldset><legend>Контакты <i>на сайте не показываем</i></legend>
-        <div class="f2">
-          <label class="f"><span>Имя</span><input name="name" autocomplete="name" maxlength="80" required></label>
-          <label class="f"><span>Телефон</span><input name="phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="30" placeholder="+7" required></label>
-          <label class="f"><span>Почта <i>необязательно</i></span><input name="email" type="email" autocomplete="email" maxlength="120"></label>
-          <label class="f"><span>Кто вы</span><select name="role"><option>Собственник</option><option>Представитель собственника</option><option>Агент</option></select></label>
-        </div>
-      </fieldset>
-      <label class="hp" aria-hidden="true">Компания <input name="company" tabindex="-1" autocomplete="off"></label>
-      <label class="chk"><input type="checkbox" name="consent" required><span>Даю согласие на <a href="/privacy" target="_blank">обработку персональных данных</a></span></label>
-      <button class="btn" type="submit">Отправить на проверку</button>
-      <p class="form__msg" role="status" aria-live="polite"></p>
-    </form>
+    <div class="podat__call">
+      ${callBlock({ title: 'Позвоните, чтобы разместить участок', text: 'Обсудим участок и условия размещения.' })}
+    </div>
   </div>
 </section>`,
   }));
 }
 
-/* ---------- политика конфиденциальности ---------- */
-write('privacy.html', page({
-  title: 'Политика обработки персональных данных - Инвест 47', description: 'Как Инвест 47 обрабатывает персональные данные, которые вы оставляете в формах на сайте.',
-  path: '/privacy',
-  body: `<article class="wrap post"><div class="prose prose--solo">
-<h1 class="h1">Политика обработки персональных данных</h1>
-<p>Эта политика описывает, какие персональные данные собирает сайт «Инвест 47» (далее - оператор), зачем и как они обрабатываются. Политика составлена в соответствии с Федеральным законом от 27.07.2006 № 152-ФЗ «О персональных данных».</p>
-<h2>Какие данные мы получаем</h2>
-<ul><li>имя;</li><li>номер телефона;</li><li>адрес электронной почты, если вы его указали;</li><li>сведения об участке и фотографии, которые вы прикладываете к заявке на витрину;</li><li>текст комментария.</li></ul>
-<p>Данные вы передаёте сами, заполняя формы на сайте. Мы не просим и не обрабатываем специальные категории персональных данных.</p>
-<h2>Зачем</h2>
-<ul><li>чтобы перезвонить вам и ответить на вопрос об участке;</li><li>чтобы проверить участок, который вы предлагаете разместить на витрине, и связаться с вами по нему;</li><li>чтобы передать вам обращения покупателей по вашему участку.</li></ul>
-<h2>Как обрабатываются данные</h2>
-<p>Данные хранятся в защищённом хранилище, доступ к ним есть только у сотрудников оператора. Контакты владельцев участков на витрине не публикуются. Мы не продаём и не передаём ваши данные третьим лицам, кроме случаев, предусмотренных законом.</p>
-<p>Данные хранятся до достижения целей обработки или до отзыва согласия.</p>
-<h2>Согласие и его отзыв</h2>
-<p>Отправляя форму и отмечая согласие, вы соглашаетесь на обработку указанных данных для перечисленных целей. Согласие можно отозвать в любой момент: напишите или позвоните нам через раздел <a href="/#kontakty">«Контакты»</a>, и мы удалим ваши данные.</p>
-<h2>Файлы cookie и статистика</h2>
-<p>Сайт может использовать сервисы веб-аналитики, чтобы понимать, какие страницы полезны посетителям. Эти сервисы работают с обезличенными данными.</p>
-<h2>Изменения</h2>
-<p>Оператор может обновлять эту политику. Актуальная версия всегда опубликована на этой странице.</p>
-</div></article>`,
-}));
 
 /* ---------- админка ---------- */
 write('admin.html', page({

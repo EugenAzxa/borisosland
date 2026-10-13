@@ -477,3 +477,12 @@ legend{font-family:var(--fd);font-size:18px;margin-bottom:14px;padding:0}
 .lot__more:hover{color:var(--lime)}
 .post__grid>*{min-width:0}.toc a,.prose{overflow-wrap:break-word}
 .gal img{height:auto}.contact .form__t{font-size:clamp(22px,2.4vw,28px);margin:0}.contact .form p{max-width:none}
+.podat__list{margin:6px 0 22px}.podat__intro .row{margin-top:22px}
+/* блок «позвоните» вместо форм */
+.call{display:grid;gap:12px;justify-items:start;padding:clamp(22px,3vw,32px);border-radius:var(--r);background:var(--bg2);box-shadow:inset 0 0 0 1px rgba(207,226,122,.35)}
+.call__num{font-family:var(--fd);font-weight:300;font-size:clamp(26px,3.2vw,36px);line-height:1.1;color:var(--lime);text-decoration:none;white-space:nowrap}
+.call__num:hover{color:#dff08c}
+.call .btn{margin-top:6px}
+.contact .call .form__t{font-size:clamp(22px,2.4vw,28px);margin:0}
+.contact .call p{max-width:none}
+.foot__tel{font-family:var(--fd);font-size:18px;color:var(--lime)!important;text-decoration:none}

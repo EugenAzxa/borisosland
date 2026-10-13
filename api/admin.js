@@ -1,6 +1,6 @@
-// Админка: вход по паролю (ADMIN_PASSWORD), модерация заявок на витрину, обращения
+// Админка: вход по паролю (ADMIN_PASSWORD), участки на витрине. Участки заводит только Инвест 47 после звонка владельца.
 import { json, checkPassword, adminToken, isAdmin, clean, num } from '../lib/http.js';
-import { allListings, allLeads, saveListing, saveLead, deleteListingFile, deleteLeadFile, removeFiles, rebuildPublic, readJSON } from '../lib/store.js';
+import { allListings, saveListing, deleteListingFile, removeFiles, rebuildPublic, readJSON, rid } from '../lib/store.js';
 import { KINDS, DISTRICTS, CHECKS, slugify, OWN } from '../lib/listings.js';
 
 const TEXT = { title: 160, vri: 200, place: 200, kn: 200, power: 120, gas: 120, water: 120, sewer: 120, road: 160, description: 4000, note: 600, adminNote: 2000 };
@@ -18,15 +18,26 @@ export async function POST(req) {
   if (!isAdmin(req)) return json({ error: 'Нужно войти заново' }, 401);
 
   if (b.action === 'list') {
-    const [listings, leads] = await Promise.all([allListings(), allLeads()]);
+    const listings = await allListings();
     listings.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-    leads.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-    return json({ listings, leads, kinds: KINDS, districts: DISTRICTS, checks: CHECKS });
+    return json({ listings, kinds: KINDS, districts: DISTRICTS, checks: CHECKS });
+  }
+
+  // новый участок заводит сам Инвест 47 после звонка владельца
+  if (b.action === 'create') {
+    const now = new Date().toISOString();
+    const l = {
+      id: rid(8), status: 'pending', createdAt: now, updatedAt: now, owner: { name: '', phone: '', email: '', role: 'Собственник' },
+      title: 'Новый участок', kind: 'prom', vri: '', area: '', price: null, district: 'Всеволожский', place: '', kn: '', distKad: '',
+      power: '', gas: '', water: '', sewer: '', road: '', description: '', photos: [], checks: {}, note: '', adminNote: '',
+    };
+    await saveListing(l);
+    return json({ listing: l });
   }
 
   if (b.action === 'save') {
     const l = await readJSON(`listings/${clean(b.id, 20)}.json`);
-    if (!l) return json({ error: 'Заявка не найдена' }, 404);
+    if (!l) return json({ error: 'Участок не найден' }, 404);
     const p = b.patch || {};
     for (const [k, max] of Object.entries(TEXT)) if (k in p) l[k] = clean(p[k], max);
     if ('area' in p) l.area = num(p.area) || l.area;
@@ -35,7 +46,9 @@ export async function POST(req) {
     if ('kind' in p && KINDS[p.kind]) l.kind = p.kind;
     if ('district' in p && DISTRICTS.includes(p.district)) l.district = p.district;
     if ('checks' in p) l.checks = Object.fromEntries(Object.keys(CHECKS).filter((k) => p.checks[k]).map((k) => [k, 1]));
-    if (Array.isArray(p.photos)) l.photos = p.photos.filter((x) => l.photos.includes(x)); // порядок и удаление, без чужих путей
+    if (Array.isArray(p.photos)) l.photos = p.photos.filter((x) => /^photos\/[a-z0-9]{16}\.(jpg|webp|png)$/.test(x)).slice(0, 20);
+    if (p.owner) l.owner = { name: clean(p.owner.name, 80), phone: clean(p.owner.phone, 30), email: clean(p.owner.email, 120), role: clean(p.owner.role, 40) };
+    if (p.status === 'approved' && (!l.area || !l.place)) return json({ error: 'Перед публикацией укажите площадь и где находится участок' }, 400);
     if ('status' in p && ['pending', 'approved', 'rejected', 'archived'].includes(p.status)) {
       if (p.status === 'approved' && !l.publishedAt) l.publishedAt = new Date().toISOString();
       l.status = p.status;
@@ -58,20 +71,6 @@ export async function POST(req) {
     await removeFiles(l.photos || []);
     await deleteListingFile(l.id);
     await rebuildPublic();
-    return json({ ok: true });
-  }
-
-  if (b.action === 'lead') {
-    const l = await readJSON(`leads/${clean(b.id, 40)}.json`);
-    if (!l) return json({ error: 'Обращение не найдено' }, 404);
-    if ('done' in b) l.done = !!b.done;
-    if ('note' in b) l.note = clean(b.note, 1000);
-    await saveLead(l);
-    return json({ lead: l });
-  }
-
-  if (b.action === 'deleteLead') {
-    await deleteLeadFile(clean(b.id, 40));
     return json({ ok: true });
   }
 

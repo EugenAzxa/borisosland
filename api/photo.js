@@ -1,13 +1,12 @@
-// Загрузка одного фото для заявки. Браузер заранее уменьшает фото до 1600 px (JPEG),
-// здесь проверяем токен формы, размер и что это действительно картинка.
-import { json, checkFormToken } from '../lib/http.js';
+// Загрузка одного фото к участку - только из админки. Браузер заранее уменьшает фото до 1600 px (JPEG),
+// здесь проверяем вход, размер и что это действительно картинка.
+import { json, isAdmin } from '../lib/http.js';
 import { putPhoto } from '../lib/store.js';
 
 const MAX = 3 * 1024 * 1024;
 
 export async function POST(req) {
-  const t = checkFormToken(req.headers.get('x-form'));
-  if (t === 'bad' || t === 'old') return json({ error: 'Страница устарела, обновите её' }, 400);
+  if (!isAdmin(req)) return json({ error: 'Нужно войти заново' }, 401);
   const len = Number(req.headers.get('content-length') || 0);
   if (len > MAX) return json({ error: 'Фото больше 3 МБ' }, 413);
   const buf = Buffer.from(await req.arrayBuffer());

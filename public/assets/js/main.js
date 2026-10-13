@@ -43,9 +43,9 @@
   var money = function (n) { return n.toLocaleString('ru-RU').replace(/ /g, ' ') + ' ₽'; };
   var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  /* ---------- телефон задаётся в site.js; без телефона кнопки ведут к форме ---------- */
-  var phone = (window.INVEST47 || {}).phone || '';
-  var phoneHref = phone ? 'tel:' + phone.replace(/[^\d+]/g, '') : '#zayavka';
+  /* ---------- телефон задаётся в site.js ---------- */
+  var phone = (window.INVEST47 || {}).phone || '+7 911 090-47-47';
+  var phoneHref = 'tel:' + phone.replace(/[^\d+]/g, '');
 
   /* ---------- шапка ---------- */
   var top = $('#top');
@@ -88,7 +88,7 @@
           '<p class="lot__kn">≈ ' + Math.round(p.price / parseFloat(p.area.replace(',', '.')) / 1000) + ' тыс. ₽ за сотку · ' + p.kn + '</p>'
         : '<p class="lot__p ask">Цена по запросу</p>') +
       '<ul>' + p.points.map(function (t) { return '<li>' + t + '</li>'; }).join('') + '</ul>' +
-      '<a class="btn" data-lot="' + p.title + '" href="' + phoneHref + '">Узнать про участок</a>' +
+      '<a class="btn" href="' + phoneHref + '">Позвонить про участок</a>' +
       '<a class="lot__more" href="/vitrina/' + p.slug + '">Подробнее об участке</a>';
     lots.appendChild(el);
   });
@@ -119,7 +119,7 @@
       '<p class="price">' + (p.price ? money(p.price) : 'Цена по запросу') + '</p>' +
       '<p>' + p.points.join(' · ') + '</p>' +
       (p.kn ? '<p style="margin-top:8px">' + p.kn + '</p>' : '') +
-      '<a class="btn" data-lot="' + p.title + '" href="' + phoneHref + '">Узнать про участок</a>';
+      '<a class="btn" href="' + phoneHref + '">Позвонить про участок</a>';
   }
   $('.plan__map').addEventListener('mouseleave', function () {
     if (window.matchMedia('(hover: hover)').matches && current) { current.classList.remove('is-on'); current = null; info.innerHTML = infoDefault; }

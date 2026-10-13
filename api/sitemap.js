@@ -7,7 +7,7 @@ import blog from '../lib/blog-index.js';
 export async function GET() {
   const pub = await publicListings().catch(() => []);
   const urls = [
-    ['/', '1.0'], ['/vitrina', '0.9'], ['/vitrina/podat', '0.7'], ['/blog', '0.7'], ['/privacy', '0.2'],
+    ['/', '1.0'], ['/vitrina', '0.9'], ['/vitrina/podat', '0.7'], ['/blog', '0.7'],
     ...OWN.map((l) => ['/vitrina/' + l.slug, '0.8']),
     ...pub.map((l) => ['/vitrina/' + l.slug, '0.8', l.updatedAt]),
     ...blog.map((p) => ['/blog/' + p.slug, '0.6', p.date]),
