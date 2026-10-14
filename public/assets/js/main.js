@@ -6,7 +6,7 @@
   var CONFIG = {
     film: {
       d: { dir: 'assets/film/d2/', count: 139, crop: [0, 1] },      // кадры для компьютера, весь кадр 16:9
-      m: { dir: 'assets/film/m4/', count: 70, crop: [.1, .8] }       // телефон: центральные 80% ширины, 720 px, каждый второй кадр
+      m: { dir: 'assets/film/m5/', count: 90, crop: [.1, .8] }       // телефон: центральные 80% ширины, 720 px
     },
     still: 'assets/img/plan2.webp' // финальный кадр сверху, в координатах 1400 x 791
   };
@@ -367,14 +367,29 @@
     flyTop = fly.getBoundingClientRect().top + window.scrollY;
     flySpan = Math.max(1, fly.offsetHeight - stage.offsetHeight);
   }
+  // прокрутка задаёт цель, а пролёт плавно догоняет её: колесо мыши и рывки пальцем не прыгают через кадры
+  var T = 0, last = 0, first = true;
   function onScroll() {
-    var np = clamp((window.scrollY - flyTop) / flySpan, 0, 1);
-    if (np !== P) { P = np; need = true; }
+    T = reduced ? 1 : clamp((window.scrollY - flyTop) / flySpan, 0, 1);
+    if (first || reduced) { P = T; first = false; need = true; }
     onHeader();
   }
 
   var queued = false;
-  function loop() { queued = false; render(); }
+  function loop(now) {
+    queued = false;
+    var dt = last ? Math.min(.12, (now - last) / 1000) : .016;   // при подтормаживании догоняем по реальному времени
+    last = now;
+    if (P !== T) {
+      // далеко от цели (прыжок по ссылке) - догоняем быстрее, чтобы не пролетать весь фильм
+      var rate = Math.abs(T - P) > .15 ? 14 : 7.5;
+      P += (T - P) * (1 - Math.exp(-dt * rate));
+      if (Math.abs(T - P) < .0003) P = T;
+      need = true;
+    }
+    render();
+    if (P !== T) kick(); else last = 0;
+  }
   function kick() { if (!queued) { queued = true; requestAnimationFrame(loop); } }
 
   if (reduced) { P = 1; fly.style.height = '100vh'; }

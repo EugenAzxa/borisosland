@@ -107,14 +107,14 @@
   section.style.setProperty('--n', N);
 
   /* прокрутка -> номер объекта (d), у каждого объекта камера задерживается */
-  var W = 0, H = 0, top0 = 0, span = 1, target = -0.5, cur = -0.5;
+  var W = 0, H = 0, top0 = 0, span = 1, target = 0, cur = 0;
   function measure() {
     W = stage.clientWidth; H = stage.clientHeight;
     top0 = section.getBoundingClientRect().top + window.scrollY;
     span = Math.max(1, section.offsetHeight - H);
   }
-  var posOf = function (q) { return -0.5 + q * (N - 0.2); };
-  var qOf = function (i) { return (i + 0.5) / (N - 0.2); };
+  var posOf = function (q) { return -0.15 + q * (N - 0.55); };      // на входе впереди сразу первый объект
+  var qOf = function (i) { return (i + 0.15) / (N - 0.55); };
   function onScroll() {
     var q = clamp((window.scrollY - top0) / span, 0, 1), pos = posOf(q), fl = Math.floor(pos);
     target = fl + sm(sm(pos - fl));
@@ -154,15 +154,22 @@
   // пролёт выше меняет высоту страницы, пока грузятся кадры
   if (window.ResizeObserver) new ResizeObserver(function () { measure(); onScroll(); }).observe(document.body);
 
-  // three.js грузим, когда до глобуса осталось полтора экрана
+  // three.js готовим заранее, пока телефон простаивает после загрузки страницы, а не в конце пролёта
+  // (иначе подготовка сцены подтормаживает последние кадры). Если долистали раньше - сразу.
   var visible = false, started = false;
-  new IntersectionObserver(function (en) {
-    var e = en[0];
-    if (e.isIntersecting && !started) {
-      started = true;
-      import(THREE_URL).then(build).catch(function () { hideOrb(); });
-    }
-  }, { rootMargin: '150% 0px' }).observe(section);
+  function start() {
+    if (started) return;
+    started = true;
+    import(THREE_URL).then(build).catch(function () { hideOrb(); });
+  }
+  new IntersectionObserver(function (en) { if (en[0].isIntersecting) start(); }, { rootMargin: '100% 0px' }).observe(section);
+  function idleStart() {
+    setTimeout(function () {
+      if (window.requestIdleCallback) requestIdleCallback(start, { timeout: 4000 }); else start();
+    }, 1500);
+  }
+  if (document.readyState === 'complete') idleStart(); else window.addEventListener('load', idleStart);
+  showCard(0); active = 0;
   new IntersectionObserver(function (en) { visible = en[0].isIntersecting; if (visible && api.kick) api.kick(); }).observe(section);
 
   function build(T) {
@@ -383,6 +390,9 @@
     api.resize = function () { resize(); kick(); };
     api.kick = kick;
     api.filter = function () { kick(); };
+    // шейдеры и текстуры отдаём видеокарте сразу, пока глобус не на экране
+    if (renderer.compile) renderer.compile(scene, cam);
+    frame();
     section.classList.add('is-ready');
     kick();
   }
