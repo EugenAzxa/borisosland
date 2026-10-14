@@ -185,7 +185,9 @@ const objPrice = (o) => {
   const ps = (o.plots || []).filter((p) => p.price && !p.sold).map((p) => p.price);
   if (o.price) return o.price;
   if (!ps.length) return 'Цена по запросу';
-  return 'от ' + String(Math.min(...ps) / 1e6).replace('.', ',') + ' млн ₽';
+  const m = Math.min(...ps);
+  // круглые суммы - в миллионах, остальные целиком, чтобы «от» не округляло цену вверх
+  return 'от ' + (m % 100000 ? m.toLocaleString('ru-RU').replace(/\s/g, ' ') + ' ₽' : String(m / 1e6).replace('.', ',') + ' млн ₽');
 };
 function objCard(o, i) {
   const [w, h] = objSize(o.img);
