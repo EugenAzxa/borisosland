@@ -5,33 +5,33 @@
   /* ---------- настройки: правки здесь ---------- */
   var CONFIG = {
     film: {
-      d: { dir: 'assets/film/d1/', count: 139, crop: [0, 1] },      // кадры для компьютера, весь кадр 16:9
-      m: { dir: 'assets/film/m3/', count: 70, crop: [.1, .8] }       // телефон: центральные 80% ширины, 720 px, каждый второй кадр
+      d: { dir: 'assets/film/d2/', count: 139, crop: [0, 1] },      // кадры для компьютера, весь кадр 16:9
+      m: { dir: 'assets/film/m4/', count: 70, crop: [.1, .8] }       // телефон: центральные 80% ширины, 720 px, каждый второй кадр
     },
-    still: 'assets/img/plan.webp' // финальный кадр сверху, в координатах 1400 x 791
+    still: 'assets/img/plan2.webp' // финальный кадр сверху, в координатах 1400 x 791
   };
 
-  /* Участки в координатах финального кадра (1400 x 791). Верхний ряд - 7 проданных,
-     нижний - 4 больших, первый от трассы с подстанцией. */
+  /* Участки в координатах финального кадра (1400 x 791), раскладка как на плане посёлка:
+     слева 7 проданных (2 + 2 + 1 широкий + 2), справа колонка из 4, трасса Кола внизу. */
   var PLOTS = [
-    { x: 305, y: 216, w: 135, h: 146, sold: true },
-    { x: 450, y: 216, w: 110, h: 146, sold: true },
-    { x: 572, y: 216, w: 116, h: 146, sold: true },
-    { x: 698, y: 216, w: 120, h: 146, sold: true },
-    { x: 828, y: 216, w: 118, h: 146, sold: true },
-    { x: 956, y: 216, w: 90, h: 146, sold: true },
-    { x: 1056, y: 216, w: 89, h: 146, sold: true },
-    { id: 'u2372', x: 297, y: 401, w: 196, h: 148, area: '23,72', price: 15000000, tp: true,
-      title: 'Участок 23,72 сот.', slug: 'murmanskoe-6-km-23-72-sot',
-      kn: 'К/н 47:07:1047002:3249, 3250',
-      points: ['Промназначение', '150 кВт подключены, подстанция на участке', 'Доля 4 сот. в общей дороге в собственность', 'Первый от трассы Кола'] },
-    { x: 503, y: 401, w: 219, h: 148, sold: true },
-    { id: 'u2085', x: 733, y: 401, w: 223, h: 148, area: '20,85', price: 11500000,
+    { x: 380, y: 100, w: 148, h: 112, sold: true },
+    { x: 540, y: 100, w: 152, h: 112, sold: true },
+    { x: 355, y: 233, w: 172, h: 120, sold: true },
+    { x: 537, y: 233, w: 158, h: 120, sold: true },
+    { x: 352, y: 368, w: 344, h: 118, sold: true },
+    { x: 345, y: 498, w: 166, h: 128, sold: true },
+    { x: 520, y: 498, w: 176, h: 128, sold: true },
+    { id: 'u265', x: 745, y: 98, w: 282, h: 122, area: '26,51', price: 14000000,
+      kn: 'К/н 47:07:1047002:3200', title: 'Участок 26,51 сот.', slug: 'murmanskoe-6-km-26-5-sot',
+      points: ['Самый большой из свободных', 'Промназначение', 'Подъезд по общей внутренней дороге', 'Без управляющей компании'] },
+    { id: 'u2085', x: 745, y: 233, w: 292, h: 122, area: '20,85', price: 11500000,
       kn: 'К/н 47:07:1047002:3202', title: 'Участок 20,85 сот.', slug: 'murmanskoe-6-km-20-85-sot',
       points: ['Промназначение', 'Подъезд по общей внутренней дороге', 'Выезд на Мурманское шоссе', 'Без управляющей компании'] },
-    { id: 'u265', x: 967, y: 401, w: 191, h: 148, area: '26,51', price: 14000000,
-      kn: 'К/н 47:07:1047002:3200', title: 'Участок 26,51 сот.', slug: 'murmanskoe-6-km-26-5-sot',
-      points: ['Самый большой из свободных', 'Промназначение', 'Подъезд по общей внутренней дороге', 'Без управляющей компании'] }
+    { x: 745, y: 368, w: 300, h: 120, sold: true },
+    { id: 'u2372', x: 745, y: 498, w: 328, h: 138, dx: -20, area: '23,72', price: 15000000, tp: true,
+      title: 'Участок 23,72 сот.', slug: 'murmanskoe-6-km-23-72-sot',
+      kn: 'К/н 47:07:1047002:3249, 3250',
+      points: ['Промназначение', '150 кВт подключены, подстанция на участке', 'Доля 4 сот. в общей дороге в собственность', 'Первый от трассы Кола'] }
   ];
   var FREE = PLOTS.filter(function (p) { return !p.sold; });
   var SVGNS = 'http://www.w3.org/2000/svg';
@@ -49,7 +49,7 @@
 
   /* ---------- шапка ---------- */
   var top = $('#top');
-  function onHeader() { top.classList.toggle('is-solid', window.scrollY > window.innerHeight * 5.2); }
+  function onHeader() { top.classList.toggle('is-solid', window.scrollY > window.innerHeight * 3.9); }
 
   /* ---------- svg-участки (используются и в пролёте, и в генплане) ---------- */
   function plotNode(p, cls) {
@@ -58,7 +58,7 @@
     var r = document.createElementNS(SVGNS, 'rect');
     r.setAttribute('x', p.x); r.setAttribute('y', p.y); r.setAttribute('width', p.w); r.setAttribute('height', p.h); r.setAttribute('rx', 4);
     g.appendChild(r);
-    var cx = p.x + p.w / 2 + (p.tp ? 22 : 0), cy = p.y + p.h / 2 - (p.tp ? 14 : 0);
+    var cx = p.x + p.w / 2 + (p.dx || 0), cy = p.y + p.h / 2 + (p.dy || 0);
     var t1 = document.createElementNS(SVGNS, 'text');
     t1.setAttribute('class', 't1'); t1.setAttribute('x', cx);
     t1.setAttribute('y', p.sold ? cy + 6 : cy + 4);
@@ -111,7 +111,7 @@
     current = g; g.classList.add('is-on');
     if (p.sold) {
       info.innerHTML = '<p class="eyebrow">Продан</p><h3>Этот участок уже продан</h3>' +
-        '<p>Свободными остались три участка в нижнем ряду: 23,72, 20,85 и 26,51 сотки.</p>' +
+        '<p>Свободными остались три участка в правом ряду: 26,51, 20,85 и 23,72 сотки.</p>' +
         '<a class="btn btn--ghost" href="#uchastki">Свободные участки</a>';
       return;
     }
@@ -175,22 +175,23 @@
   }
 
   // метки объектов Инвест 47: видны с высоты, при снижении разлетаются от центра, остаётся посёлок у Колы.
-  // Координаты меток - на кадре 60 (1400 x 791), масштаб местности по кадрам замерен по ширине посёлка
+  // Координаты меток - на кадре 60 (1400 x 791), масштаб местности по кадрам замерен по ширине посёлка (кадры _src/v2)
   var pinsBox = $('#flyPins'), cap = $('#flyCap'), pins = [];
   var objData = document.getElementById('objData');
-  var ZOOM = [[0, .09], [30, .11], [40, .12], [60, .14], [85, .156], [100, .22], [110, .34], [138, .5]];
-  var PC = [667, 400];                                         // центр приближения - посёлок у Колы
+  var ZOOM = [[0, .05], [25, .094], [45, .125], [60, .154], [85, .2], [100, .286], [115, .39], [138, .56]];
+  var PC = [690, 378];                                         // центр приближения - посёлок у Колы
   function zoomAt(f) {
     for (var k = 1; k < ZOOM.length; k++) if (f <= ZOOM[k][0]) {
       var a = ZOOM[k - 1], b = ZOOM[k];
-      return (a[1] + (b[1] - a[1]) * (f - a[0]) / (b[0] - a[0])) / .14;
+      return (a[1] + (b[1] - a[1]) * (f - a[0]) / (b[0] - a[0])) / .154;
     }
-    return ZOOM[ZOOM.length - 1][1] / .14;
+    return ZOOM[ZOOM.length - 1][1] / .154;
   }
   if (pinsBox && objData) {
     JSON.parse(objData.textContent).forEach(function (o, k) {
       var el = document.createElement('span');
-      el.className = 'fpin' + (k ? '' : ' fpin--main');
+      // на телефоне подписи только у половины меток, остальные - точки, иначе подписи налезают друг на друга
+      el.className = 'fpin' + (k ? '' : ' fpin--main') + (k % 2 ? ' fpin--sm' : '');
       el.innerHTML = '<b>' + o.label + '</b><i></i>';
       pinsBox.appendChild(el);
       pins.push({ el: el, x: o.pin[0], y: o.pin[1], k: k });
@@ -206,7 +207,7 @@
     if (portrait()) {                                           // телефон: метки сжимаем по ширине, чтобы все были на экране
       var mx = 1;
       pins.forEach(function (q) { mx = Math.max(mx, Math.abs(q.x - PC[0]) * z * L.s); });
-      c = Math.min(1, (W / 2 - 64) / mx);
+      c = Math.min(1, (W / 2 - 24) / mx);
     }
     pins.forEach(function (q) {
       var sx = L.x + (PC[0] + (q.x - PC[0]) * z) * L.s, sy = L.y + (PC[1] + (q.y - PC[1]) * z) * L.s;
@@ -249,15 +250,15 @@
       s1 = W / 960;
       var k = Math.pow(s1 / s0, t), sc = s0 * k;
       var u = ease(seg(P, .88, .95));                             // поднимаем кадр, когда выезжает карточка
-      var fx = 700 + 35 * t, fy = 395.5 + 4.5 * t, Y = H / 2 + (H * 0.34 - H / 2) * u;
+      var fx = 700 + 16 * t, fy = 395.5 - 12 * t, Y = H / 2 + (H * 0.34 - H / 2) * u;
       return { s: sc, x: W / 2 - fx * sc, y: Y - fy * sc };
     } else {
       // компьютер: посёлок слева, справа место под карточку
       // компьютер: весь посёлок вместе с трассой слева, справа место под карточку
       var right = W > 900 ? Math.min(480, W * 0.34) : 0;
-      s1 = Math.min(cover, (W - right - 24) / 1210, (H - 40) / 791);
-      cx1 = Math.max(16 - 30 * s1, (W - right) / 2 - 615 * s1);
-      cy1 = H / 2 - 395.5 * s1 + 18;
+      s1 = Math.min(cover, (W - right - 24) / 900, (H - 84) / 791);
+      cx1 = (W - right) / 2 - 716 * s1;
+      cy1 = H / 2 - 395.5 * s1 + 30;
     }
     var e = ease(t);
     return { s: s0 + (s1 - s0) * e, x: cx0 + (cx1 - cx0) * e, y: cy0 + (cy1 - cy0) * e };

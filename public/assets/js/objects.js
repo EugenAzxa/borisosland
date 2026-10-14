@@ -1,4 +1,4 @@
-/* Инвест 47 - дорога с объектами, список объектов, окно объекта.
+/* Инвест 47 - глобус с объектами, список объектов, окно объекта.
    Данные объектов лежат в lib/objects.js, сборка кладёт их в <script id="objData"> на главной. */
 (function () {
   'use strict';
@@ -71,13 +71,14 @@
     if (b) { e.preventDefault(); openObj(+b.getAttribute('data-open')); }
   });
 
-  /* ---------- фильтр по типу (общий для дороги и списка) ---------- */
+  /* ---------- фильтр по типу (общий для глобуса и списка) ---------- */
   var kind = '';
   var match = function (i) { return !kind || OBJ[i].kind === kind; };
+  var orb = null;
   var cards = document.querySelectorAll('#objs .oc');
   function applyFilter() {
     cards.forEach(function (c) { c.hidden = !match(+c.getAttribute('data-i')); });
-    if (road) road.filter();
+    if (orb) orb.filter();
   }
   var chips = $('#roadChips');
   if (chips) chips.addEventListener('click', function (e) {
@@ -86,275 +87,303 @@
     kind = b.getAttribute('data-kind');
     chips.querySelectorAll('button').forEach(function (x) { x.classList.toggle('is-on', x === b); });
     applyFilter();
-    if (road) { for (var i = 0; i < N; i++) if (match(i)) { road.go(i); break; } }
+    if (orb) { for (var i = 0; i < N; i++) if (match(i)) { orb.go(i); break; } }
   });
 
-  /* ---------- дорога ---------- */
+  /* ---------- глобус: объекты по кругу вокруг Земли ---------- */
   var section = $('#obekty');
-  var road = null;
   if (!section) return;
-  if (reduced) {
-    // без анимации: дорогу не показываем, ссылки ведут к списку
+  function hideOrb() {
+    // без анимации или без WebGL: глобус не показываем, ссылки ведут к списку
     section.hidden = true;
     document.querySelectorAll('a[href="#obekty"]').forEach(function (a) { a.setAttribute('href', '#vse-obekty'); });
-    return;
   }
-  road = buildRoad();
-  applyFilter();
+  var hasGL = (function () { try { var c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch (e) { return false; } })();
+  if (reduced || !hasGL) { hideOrb(); return; }
 
-  function buildRoad() {
-    var stage = $('.road__stage', section), world = $('#roadWorld'), card = $('#roadCard'), route = $('#roadRoute');
-    var mobile = function () { return W < 700; };
+  var THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.min.js';
+  var stage = $('.orb__stage', section), glBox = $('#orbGl'), labelsBox = $('#orbLabels'), card = $('#roadCard');
+  var STEP = Math.PI * 2 / N;
+  section.style.setProperty('--n', N);
 
-    /* мир: дорога снизу вверх, объекты по очереди справа и слева */
-    var G = 640, TW = 460, WW = 3000, START = 1900, END = 1600;
-    var LEN = START + (N - 1) * G + END;
-    var yObj = function (i) { return LEN - START - i * G; };
-    var roadX = function (y) { return WW / 2 + 170 * Math.sin(y / 1300) + 70 * Math.sin(y / 530 + 1.3); };
-    var roadDX = function (y) { return 170 / 1300 * Math.cos(y / 1300) + 70 / 530 * Math.cos(y / 530 + 1.3); };
-    section.style.setProperty('--n', N);
-    world.style.width = WW + 'px';
-    world.style.height = LEN + 'px';
+  /* прокрутка -> номер объекта (d), у каждого объекта камера задерживается */
+  var W = 0, H = 0, top0 = 0, span = 1, target = -0.5, cur = -0.5;
+  function measure() {
+    W = stage.clientWidth; H = stage.clientHeight;
+    top0 = section.getBoundingClientRect().top + window.scrollY;
+    span = Math.max(1, section.offsetHeight - H);
+  }
+  var posOf = function (q) { return -0.5 + q * (N - 0.2); };
+  var qOf = function (i) { return (i + 0.5) / (N - 0.2); };
+  function onScroll() {
+    var q = clamp((window.scrollY - top0) / span, 0, 1), pos = posOf(q), fl = Math.floor(pos);
+    target = fl + sm(sm(pos - fl));
+  }
+  function go(i) { window.scrollTo({ top: top0 + qOf(i) * span + 1, behavior: 'smooth' }); }
 
-    // лес сверху: процедурная бесшовная текстура
-    var tex = (function () {
-      var c = document.createElement('canvas'), S = 320;
-      c.width = c.height = S;
+  /* карточка объекта */
+  var active = -1;
+  function showCard(i) {
+    var o = OBJ[i];
+    card.innerHTML =
+      '<div class="rc__top"><p class="rc__n"><b>' + pad(i + 1) + '</b> / ' + N + ' · ' + esc(o.type) + '</p>' +
+      '<div class="rc__nav"><button type="button" data-step="-1" aria-label="Предыдущий объект"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>' +
+      '<button type="button" data-step="1" aria-label="Следующий объект"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button></div></div>' +
+      '<h3>' + esc(o.title) + '</h3>' +
+      '<p class="rc__place">' + esc(o.place) + '</p>' +
+      '<p class="rc__row"><b>' + esc(o.area) + '</b><span>' + esc(o.status) + '</span><span class="rc__p">' + esc(o.priceT) + '</span></p>' +
+      '<div class="rc__btns"><button class="btn btn--sm" type="button" data-open="' + i + '">Подробнее</button>' +
+      '<a class="btn btn--sm btn--ghost" href="' + tel + '">Позвонить</a></div>';
+    card.classList.remove('is-in'); void card.offsetWidth; card.classList.add('is-in');
+  }
+  card.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-step]');
+    if (!b) return;
+    var s = +b.getAttribute('data-step'), i = active + s;
+    while (i >= 0 && i < N && !match(i)) i += s;
+    if (i >= 0 && i < N) go(i);
+  });
+
+  var api = { ready: false, filter: function () {} };
+  orb = { go: go, filter: function () { api.filter(); } };
+
+  measure(); onScroll();
+  window.addEventListener('resize', function () { measure(); onScroll(); if (api.resize) api.resize(); });
+  window.addEventListener('load', function () { measure(); onScroll(); });
+  window.addEventListener('scroll', onScroll, { passive: true });
+  // пролёт выше меняет высоту страницы, пока грузятся кадры
+  if (window.ResizeObserver) new ResizeObserver(function () { measure(); onScroll(); }).observe(document.body);
+
+  // three.js грузим, когда до глобуса осталось полтора экрана
+  var visible = false, started = false;
+  new IntersectionObserver(function (en) {
+    var e = en[0];
+    if (e.isIntersecting && !started) {
+      started = true;
+      import(THREE_URL).then(build).catch(function () { hideOrb(); });
+    }
+  }, { rootMargin: '150% 0px' }).observe(section);
+  new IntersectionObserver(function (en) { visible = en[0].isIntersecting; if (visible && api.kick) api.kick(); }).observe(section);
+
+  function build(T) {
+    var mobile = function () { return W < 760; };
+    var renderer = new T.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, mobile() ? 1.75 : 2));
+    renderer.outputColorSpace = T.SRGBColorSpace;
+    glBox.appendChild(renderer.domElement);
+    var scene = new T.Scene();
+    var cam = new T.PerspectiveCamera(30, 1, .1, 200);
+    var loader = new T.TextureLoader();
+
+    var R = 1.45, RING = 2.95, TILT = .3;
+    var root = new T.Group(); scene.add(root);
+
+    /* Земля: день + огни городов на ночной стороне + ободок атмосферы (текстуры NASA) */
+    var day = loader.load('/assets/img/earth-day.webp'); day.colorSpace = T.SRGBColorSpace; day.anisotropy = 4;
+    var night = loader.load('/assets/img/earth-night.webp');
+    var globeMat = new T.ShaderMaterial({
+      uniforms: { day: { value: day }, night: { value: night }, sun: { value: new T.Vector3(-.62, .48, .62).normalize() } },
+      vertexShader: 'varying vec2 vUv;varying vec3 vN;varying vec3 vV;void main(){vUv=uv;vN=normalize(normalMatrix*normal);vec4 mv=modelViewMatrix*vec4(position,1.);vV=normalize(-mv.xyz);gl_Position=projectionMatrix*mv;}',
+      fragmentShader: 'uniform sampler2D day;uniform sampler2D night;uniform vec3 sun;varying vec2 vUv;varying vec3 vN;varying vec3 vV;' +
+        'void main(){vec3 n=normalize(vN);float l=dot(n,sun);float k=smoothstep(-.18,.3,l);' +
+        'vec3 d=texture2D(day,vUv).rgb*vec3(.62,.7,.58);' +
+        'float c=texture2D(night,vUv).r;vec3 nc=vec3(1.,.8,.42)*pow(c,1.7)*1.5+vec3(.004,.007,.01);' +
+        'vec3 col=mix(nc,d*(.18+1.05*max(l,0.)),k);' +
+        'float f=pow(1.-max(dot(n,vV),0.),3.);col+=vec3(.45,.68,.32)*f*.35;' +
+        'gl_FragColor=vec4(col,1.);\n#include <colorspace_fragment>\n}'
+    });
+    var tiltG = new T.Group(); root.add(tiltG);
+    var globe = new T.Mesh(new T.SphereGeometry(R, 96, 64), globeMat);
+    tiltG.add(globe);
+    var atm = new T.Mesh(new T.SphereGeometry(R * 1.12, 64, 48), new T.ShaderMaterial({
+      vertexShader: 'varying vec3 vN;void main(){vN=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+      fragmentShader: 'varying vec3 vN;void main(){float i=pow(.7-dot(vN,vec3(0.,0.,1.)),3.)*.55;gl_FragColor=vec4(vec3(.55,.8,.42)*i,i);}',
+      side: T.BackSide, blending: T.AdditiveBlending, transparent: true, depthWrite: false
+    }));
+    tiltG.add(atm);
+
+    // Петербург и Ленобласть смотрят на зрителя, чуть выше центра
+    var lat = 59.94 * Math.PI / 180, lon = 30.31 * Math.PI / 180;
+    var phi = lon + Math.PI, th = Math.PI / 2 - lat;
+    var spb = new T.Vector3(-Math.cos(phi) * Math.sin(th), Math.cos(th), Math.sin(phi) * Math.sin(th));
+    var spin0 = Math.atan2(-spb.x, spb.z);
+    tiltG.rotation.x = 35 * Math.PI / 180;
+
+    // точка на Петербурге: свечение и расходящееся кольцо
+    function glowTex(inner) {
+      var c = document.createElement('canvas'); c.width = c.height = 128;
+      var x = c.getContext('2d'), g = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+      if (inner) { g.addColorStop(0, 'rgba(240,255,190,1)'); g.addColorStop(.18, 'rgba(207,226,122,.95)'); g.addColorStop(.45, 'rgba(207,226,122,.25)'); g.addColorStop(1, 'rgba(207,226,122,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); }
+      else { x.strokeStyle = 'rgba(207,226,122,1)'; x.lineWidth = 5; x.beginPath(); x.arc(64, 64, 58, 0, 7); x.stroke(); }
+      var t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; return t;
+    }
+    var dot = new T.Sprite(new T.SpriteMaterial({ map: glowTex(true), blending: T.AdditiveBlending, depthWrite: false, transparent: true }));
+    dot.scale.setScalar(.34);
+    var ring = new T.Sprite(new T.SpriteMaterial({ map: glowTex(false), blending: T.AdditiveBlending, depthWrite: false, transparent: true }));
+    var spbPos = spb.clone().multiplyScalar(R * 1.01);
+    dot.position.copy(spbPos); ring.position.copy(spbPos);
+    globe.add(dot); globe.add(ring);
+
+    /* карточки объектов на кольце вокруг Земли */
+    var ringG = new T.Group(); ringG.rotation.x = TILT; root.add(ringG);
+    var CW = 1.2, CH = .9, TW = 640, TH = 480;
+    function rr(x, a, b, w, h, r) { x.beginPath(); x.moveTo(a + r, b); x.arcTo(a + w, b, a + w, b + h, r); x.arcTo(a + w, b + h, a, b + h, r); x.arcTo(a, b + h, a, b, r); x.arcTo(a, b, a + w, b, r); x.closePath(); }
+    var frameTex = (function () {
+      var c = document.createElement('canvas'); c.width = TW + 120; c.height = TH + 120;
       var x = c.getContext('2d');
-      x.fillStyle = '#0e160b'; x.fillRect(0, 0, S, S);
-      var rnd = (function (s) { return function () { s = (s * 16807) % 2147483647; return s / 2147483647; }; })(47);
-      var tones = [[30, 46, 24], [34, 52, 27], [27, 41, 21], [38, 56, 29], [24, 36, 19], [42, 60, 31]];
-      var crowns = [];
-      for (var k = 0; k < 430; k++) crowns.push([rnd() * S, rnd() * S, 5 + rnd() * 7, tones[(rnd() * tones.length) | 0]]);
-      crowns.sort(function (a, b) { return a[1] - b[1]; });                 // дальние кроны под ближними
-      crowns.forEach(function (t) {
-        for (var ox = -S; ox <= S; ox += S) for (var oy = -S; oy <= S; oy += S) {
-          var cx = t[0] + ox, cy = t[1] + oy, r = t[2], c0 = t[3];
-          if (cx < -r * 2 || cx > S + r * 2 || cy < -r * 2 || cy > S + r * 2) continue;
-          x.fillStyle = 'rgba(4,7,3,.45)';
-          x.beginPath(); x.arc(cx + r * .35, cy + r * .45, r, 0, 7); x.fill();
-          var g = x.createRadialGradient(cx - r * .35, cy - r * .4, r * .1, cx, cy, r);
-          g.addColorStop(0, 'rgb(' + (c0[0] + 12) + ',' + (c0[1] + 15) + ',' + (c0[2] + 7) + ')');
-          g.addColorStop(.6, 'rgb(' + c0.join(',') + ')');
-          g.addColorStop(1, 'rgb(' + (c0[0] - 10) + ',' + (c0[1] - 14) + ',' + (c0[2] - 8) + ')');
-          x.fillStyle = g;
-          x.beginPath(); x.arc(cx, cy, r, 0, 7); x.fill();
-        }
-      });
-      return c.toDataURL('image/png');
+      x.shadowColor = 'rgba(207,226,122,.9)'; x.shadowBlur = 40;
+      x.strokeStyle = 'rgba(207,226,122,1)'; x.lineWidth = 6;
+      rr(x, 60, 60, TW, TH, 30); x.stroke();
+      var t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; return t;
     })();
-
-    // участки земли по 900 px: лес + кусок дороги (svg)
-    var CH = 900, chunks = [];
-    var SVGNS = 'http://www.w3.org/2000/svg';
-    for (var y0 = 0; y0 < LEN; y0 += CH) {
-      var el = document.createElement('div');
-      el.className = 'rw-chunk';
-      el.style.top = y0 + 'px';
-      el.style.width = WW + 'px';
-      el.style.height = (CH + 1) + 'px';
-      el.style.backgroundImage = 'url(' + tex + ')';
-      el.style.backgroundPosition = '0 ' + (-y0) + 'px';
-      // путь рисуем снизу вверх, как едет камера; разметка продолжается с соседнего куска
-      var yb = Math.min(LEN, y0 + CH + 20), pts = [];
-      for (var y = yb; y >= y0 - 20; y -= 20) pts.push([roadX(y), y - y0]);
-      var startDist = arc(LEN, yb);
-      var d = 'M' + pts.map(function (p) { return p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' L');
-      var svg = document.createElementNS(SVGNS, 'svg');
-      svg.setAttribute('class', 'rw-road');
-      svg.setAttribute('width', WW); svg.setAttribute('height', CH + 1);
-      svg.setAttribute('viewBox', '0 0 ' + WW + ' ' + (CH + 1));
-      svg.innerHTML =
-        '<path d="' + d + '" class="r0"/><path d="' + d + '" class="r1"/><path d="' + d + '" class="r2"/>' +
-        '<path d="' + d + '" class="r3" style="stroke-dashoffset:' + (startDist % 54).toFixed(1) + '"/>';
-      el.appendChild(svg);
-      world.appendChild(el);
-      chunks.push({ el: el, y0: y0, y1: y0 + CH, on: true });
-    }
-    function arc(ya, yb) { // длина дороги между ya (ниже) и yb (выше)
-      var s = 0, x0 = roadX(ya);
-      for (var y = ya - 20; y >= yb - 1e-6; y -= 20) { var x1 = roadX(y); s += Math.hypot(x1 - x0, 20); x0 = x1; }
-      return s;
-    }
-
-    // надписи на асфальте: название трассы у первого объекта на ней и «Инвест 47» на старте
-    function paint(text, y, cls) {
-      var t = document.createElement('div');
-      t.className = 'rw-paint ' + (cls || '');
-      t.textContent = text;
-      var ang = Math.atan(roadDX(y)) * 180 / Math.PI;           // надпись читается по ходу движения
-      t.style.transform = 'translate(' + (roadX(y) + 24).toFixed(1) + 'px,' + y + 'px) translate(-50%,-50%) rotate(' + (-90 - ang).toFixed(2) + 'deg)';
-      world.appendChild(t);
-    }
-    paint('ИНВЕСТ 47', yObj(0) + G * 1.45, 'rw-paint--big');
-    var lastRoad = null;
-    OBJ.forEach(function (o, i) {
-      if (o.road && o.road !== lastRoad) paint(o.road.toUpperCase(), yObj(i) + G * .62);
-      lastRoad = o.road;
-    });
-
-    // объекты: плитка с картинкой, съезд с дороги, подпись над плиткой
-    var labelsBox = document.createElement('div');
-    labelsBox.className = 'road__labels';
-    labelsBox.setAttribute('aria-hidden', 'true');
-    $('.road__view', section).after(labelsBox);
-    var items = OBJ.map(function (o, i) {
-      var side = i % 2 ? -1 : 1;
-      var th = clamp(TW * o.h / o.w, 290, 500);
-      var y = yObj(i), rx = roadX(y);
-      var cx = rx + side * (78 + TW / 2);
-      var drive = document.createElement('div');
-      drive.className = 'rw-drive';
-      drive.style.left = (side > 0 ? rx + 40 : cx + TW / 2 - 4) + 'px';
-      drive.style.top = (y - 14) + 'px';
-      drive.style.width = (Math.abs(cx - rx) - TW / 2 - 36) + 'px';
-      world.appendChild(drive);
-      var tile = document.createElement('div');
-      tile.className = 'rw-tile';
-      tile.setAttribute('data-open', i);
-      tile.style.left = (cx - TW / 2) + 'px';
-      tile.style.top = (y - th / 2) + 'px';
-      tile.style.width = TW + 'px';
-      tile.style.height = th + 'px';
-      var img = document.createElement('img');
-      img.alt = '';
-      img.decoding = 'async';
-      tile.appendChild(img);
-      world.appendChild(tile);
+    var cards3 = OBJ.map(function (o, i) {
+      var c = document.createElement('canvas'); c.width = TW; c.height = TH;
+      var x = c.getContext('2d');
+      x.fillStyle = '#18200f'; rr(x, 0, 0, TW, TH, 30); x.fill();
+      var tex = new T.CanvasTexture(c); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 4;
+      var im = new Image();
+      im.onload = function () {
+        // картинка «по размеру карточки», затемнение по краям и тонкая рамка - чтобы карточки были одной серией
+        x.save(); rr(x, 0, 0, TW, TH, 30); x.clip();
+        var s = Math.max(TW / im.width, TH / im.height);
+        x.drawImage(im, (TW - im.width * s) / 2, (TH - im.height * s) / 2, im.width * s, im.height * s);
+        var g = x.createLinearGradient(0, 0, 0, TH);
+        g.addColorStop(0, 'rgba(8,11,6,.12)'); g.addColorStop(.6, 'rgba(8,11,6,0)'); g.addColorStop(1, 'rgba(8,11,6,.5)');
+        x.fillStyle = g; x.fillRect(0, 0, TW, TH);
+        var v = x.createRadialGradient(TW / 2, TH / 2, TH * .35, TW / 2, TH / 2, TW * .62);
+        v.addColorStop(0, 'rgba(8,11,6,0)'); v.addColorStop(1, 'rgba(8,11,6,.45)');
+        x.fillStyle = v; x.fillRect(0, 0, TW, TH);
+        x.restore();
+        x.strokeStyle = 'rgba(238,240,230,.42)'; x.lineWidth = 3; rr(x, 1.5, 1.5, TW - 3, TH - 3, 29); x.stroke();
+        tex.needsUpdate = true; need = true;
+      };
+      im.src = '/assets/img/obj/' + o.img + '-s.webp';
+      var mesh = new T.Mesh(new T.PlaneGeometry(CW, CH), new T.MeshBasicMaterial({ map: tex, transparent: true }));
+      mesh.userData.i = i;
+      var frame = new T.Mesh(new T.PlaneGeometry(CW * (TW + 120) / TW, CH * (TH + 120) / TH), new T.MeshBasicMaterial({ map: frameTex, transparent: true, opacity: 0, blending: T.AdditiveBlending, depthWrite: false }));
+      frame.position.z = -.002;
+      var g = new T.Group(); g.add(frame); g.add(mesh);
+      ringG.add(g);
+      // дуга от Петербурга к объекту
+      var pts = new Float32Array(25 * 3);
+      var geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pts, 3));
+      var line = new T.Line(geo, new T.LineBasicMaterial({ color: 0xcfe27a, transparent: true, opacity: .15, blending: T.AdditiveBlending, depthWrite: false }));
+      scene.add(line);
       var lab = document.createElement('button');
-      lab.type = 'button';
-      lab.className = 'rl';
-      lab.tabIndex = -1;
-      lab.setAttribute('data-open', i);
-      lab.innerHTML = '<span class="rl__n">' + pad(i + 1) + '</span><span class="rl__t">' + esc(o.label) + '</span>';
+      lab.type = 'button'; lab.className = 'ol'; lab.tabIndex = -1; lab.setAttribute('data-open', i);
+      lab.innerHTML = '<span class="ol__n">' + pad(i + 1) + '</span><span class="ol__t">' + esc(o.label) + '</span>';
       labelsBox.appendChild(lab);
-      return { o: o, side: side, y: y, cx: cx, th: th, tile: tile, img: img, lab: lab, loaded: false, vis: null };
+      return { g: g, mesh: mesh, frame: frame, line: line, pts: pts, lab: lab, dim: 0 };
     });
 
-    // маршрут: точки объектов справа
-    route.innerHTML = OBJ.map(function (o, i) {
-      return '<li><button type="button" data-go="' + i + '" aria-label="' + pad(i + 1) + '. ' + esc(o.title) + '"><i></i><span>' + esc(o.label) + '</span></button></li>';
-    }).join('');
-    var dots = route.querySelectorAll('button');
-    route.addEventListener('click', function (e) { var b = e.target.closest('[data-go]'); if (b) go(+b.getAttribute('data-go')); });
-
-    // карточка объекта внизу
-    var active = -1;
-    function showCard(i) {
-      var o = OBJ[i];
-      card.innerHTML =
-        '<div class="rc__top"><p class="rc__n"><b>' + pad(i + 1) + '</b> / ' + N + ' · ' + esc(o.type) + '</p>' +
-        '<div class="rc__nav"><button type="button" data-step="-1" aria-label="Предыдущий объект"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>' +
-        '<button type="button" data-step="1" aria-label="Следующий объект"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button></div></div>' +
-        '<h3>' + esc(o.title) + '</h3>' +
-        '<p class="rc__place">' + esc(o.place) + '</p>' +
-        '<p class="rc__row"><b>' + esc(o.area) + '</b><span>' + esc(o.status) + '</span><span class="rc__p">' + esc(o.priceT) + '</span></p>' +
-        '<div class="rc__btns"><button class="btn btn--sm" type="button" data-open="' + i + '">Подробнее</button>' +
-        '<a class="btn btn--sm btn--ghost" href="' + tel + '">Позвонить</a></div>';
-      card.classList.remove('is-in'); void card.offsetWidth; card.classList.add('is-in');
-    }
-    card.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-step]');
-      if (!b) return;
-      var s = +b.getAttribute('data-step'), i = active + s;
-      while (i >= 0 && i < N && !match(i)) i += s;
-      if (i >= 0 && i < N) go(i);
-    });
-
-    /* камера */
-    var W = 0, H = 0, top0 = 0, span = 1, P = -1, need = true;
-    var D = 1150;
-    var persp = function () { return new DOMMatrix([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, -1 / D, 0, 0, 0, 1]); };
-    function measure() {
-      W = stage.clientWidth; H = stage.clientHeight;
-      top0 = section.getBoundingClientRect().top + window.scrollY;
-      span = Math.max(1, section.offsetHeight - H);
+    /* раскладка: на компьютере Земля правее (слева карточка), на телефоне выше (внизу карточка) */
+    var visW = 0, visH = 0;
+    function resize() {
+      renderer.setSize(W, H, false);
+      renderer.domElement.style.width = W + 'px'; renderer.domElement.style.height = H + 'px';
+      cam.aspect = W / H;
+      var t = Math.tan(cam.fov * Math.PI / 360) * 2;
+      var m = mobile(), needW = m ? 4.6 : 11.8, needH = m ? 8.6 : 6.1;
+      var dist = Math.max(needH / t, needW / (t * cam.aspect));
+      visH = dist * t; visW = visH * cam.aspect;
+      cam.position.set(0, dist * .14, dist);
+      cam.lookAt(0, 0, 0);
+      cam.updateProjectionMatrix();
+      root.position.set(m ? 0 : visW * .17, m ? visH * .12 : -.1, 0);
       need = true;
     }
-    var posOf = function (q) { return -0.9 + q * (N - 1 + 1.2); };
-    var qOf = function (i) { return (i + 0.9) / (N - 1 + 1.2); };
-    function go(i) {
-      window.scrollTo({ top: top0 + qOf(i) * span + 1, behavior: 'smooth' });
-    }
+    W = stage.clientWidth; H = stage.clientHeight;
+    resize();
 
-    function render() {
-      if (!need) return;
-      need = false;
-      var q = clamp((window.scrollY - top0) / span, 0, 1);
-      var pos = posOf(q), fl = Math.floor(pos), fr = pos - fl;
-      var d = fl + sm(sm(fr));                                 // камера задерживается у каждого объекта
+    var invRing = new T.Quaternion(), tmpQ = new T.Quaternion(), wp = new T.Vector3(), sp = new T.Vector3(), mp = new T.Vector3(), cp = new T.Vector3(), v3 = new T.Vector3();
+    var need = true, t0 = performance.now(), last = t0;
+    function frame() {
+      var now = performance.now(), dt = Math.min(.05, (now - last) / 1000); last = now;
+      var k = 1 - Math.pow(.0009, dt);                           // плавное догоняние прокрутки
+      cur += (target - cur) * k;
+      if (Math.abs(target - cur) < 1e-4) cur = target;
+      var d = cur, time = (now - t0) / 1000;
       var a = clamp(Math.round(d), 0, N - 1);
-      var m = mobile();
 
-      // боковой сдвиг к активному объекту
-      var panK = m ? 1 : .42;
-      var panOf = function (i) { return i < 0 || i >= N ? 0 : items[i].side * (78 + TW / 2) * panK; };
-      var pf = panOf(fl), pc = panOf(fl + 1);
-      var pan = pf + (pc - pf) * sm(fr);
-      var cy = yObj(0) - d * G + 150;
-      var cx = roadX(cy) + pan;
-      var yaw = Math.atan(roadDX(cy)) * 180 / Math.PI * .8;
-      var near = Math.abs(d - Math.round(d));                  // 0 у объекта, 0.5 между объектами
-      var tilt = (m ? 50 : 54) + near * 10;
-      var sc = m ? W / 600 : clamp(W / 1400, .72, 1.08);
-      var fx = W / 2, fy = H * (m ? .5 : .62);
+      globe.rotation.y = spin0 + .32 - clamp((d + .5) / N, 0, 1) * .64 + Math.sin(time * .15) * .03;
+      var pulse = (time * .6) % 1;
+      ring.scale.setScalar(.12 + pulse * .55); ring.material.opacity = 1 - pulse;
+      dot.scale.setScalar(.3 + Math.sin(time * 3) * .03);
 
-      var M = new DOMMatrix().translate(W / 2, H * .3).multiply(persp()).translate(-W / 2, -H * .3)
-        .translate(fx, fy).rotate(tilt, 0, 0).rotate(0, 0, yaw).scale(sc, sc).translate(-cx, -cy);
-      world.style.transform = M.toString();
+      ringG.updateMatrixWorld();
+      ringG.getWorldQuaternion(invRing); invRing.invert();
+      tmpQ.copy(invRing).multiply(cam.quaternion);
+      dot.getWorldPosition(mp);
 
-      // видимые куски земли: немного позади камеры и далеко вперёд
-      chunks.forEach(function (c) {
-        var on = c.y1 > cy - 4200 && c.y0 < cy + 1000;
-        if (on !== c.on) { c.on = on; c.el.style.visibility = on ? '' : 'hidden'; }
-      });
+      cards3.forEach(function (c, i) {
+        var ang = (i - d) * STEP;
+        c.g.position.set(RING * Math.sin(ang), 0, RING * Math.cos(ang));
+        c.g.quaternion.copy(tmpQ);                              // карточка всегда смотрит в камеру
+        var f = Math.pow((Math.cos(ang) + 1) / 2, 2.2);          // 1 - спереди, 0 - сзади
+        var on = i === a && Math.abs(d - a) < .35;
+        c.g.scale.setScalar(.5 + .62 * f + (on ? .06 : 0));
+        var dim = match(i) ? 1 : .22;
+        c.mesh.material.color.setScalar((.2 + .8 * f) * dim);
+        c.frame.material.opacity += ((on && match(i) ? 1 : 0) - c.frame.material.opacity) * .2;
+        c.g.renderOrder = Math.round(f * 100);
 
-      // плитки и подписи
-      items.forEach(function (it, i) {
-        var dy = it.y - cy;
-        var on = dy > -4200 && dy < 900;
-        if (on !== it.vis) { it.vis = on; it.tile.style.visibility = on ? '' : 'hidden'; }
-        if (!it.loaded && Math.abs(i - d) < 3.5) { it.loaded = true; it.img.src = '/assets/img/obj/' + it.o.img + '-s.webp'; }
-        it.tile.classList.toggle('is-on', i === a && Math.abs(d - a) < .3);
-        var pt = M.transformPoint(new DOMPoint(it.cx, it.y - it.th / 2, 0, 1));
-        var show = on && pt.w > .2 && i >= a;
+        // дуга от Петербурга, только к видимым спереди
+        c.g.getWorldPosition(wp);
+        cp.copy(mp).add(wp).multiplyScalar(.5);
+        v3.copy(cp).sub(root.position).normalize().multiplyScalar(.9);
+        cp.add(v3); cp.y += .35;
+        for (var j = 0; j <= 24; j++) {
+          var t = j / 24, u = 1 - t;
+          c.pts[j * 3] = u * u * mp.x + 2 * u * t * cp.x + t * t * wp.x;
+          c.pts[j * 3 + 1] = u * u * mp.y + 2 * u * t * cp.y + t * t * wp.y;
+          c.pts[j * 3 + 2] = u * u * mp.z + 2 * u * t * cp.z + t * t * wp.z;
+        }
+        c.line.geometry.attributes.position.needsUpdate = true;
+        c.line.material.opacity = (on ? .75 : .14 * f) * dim;
+        c.line.visible = f > .25;
+
+        // подпись под карточкой
+        sp.set(0, -CH / 2, 0); c.g.localToWorld(sp); sp.project(cam);
+        var show = f > .45;
         if (show) {
-          var sx = pt.x / pt.w, sy = pt.y / pt.w, s = clamp(1.25 / pt.w, .45, 1);
-          show = sy > H * .16 && sy < H * 1.1 && sx > -100 && sx < W + 100;
-          if (show) it.lab.style.transform = 'translate3d(' + sx.toFixed(1) + 'px,' + sy.toFixed(1) + 'px,0) scale(' + s.toFixed(3) + ')';
-          it.lab.style.opacity = show ? clamp(2.6 - pt.w, 0, 1) : 0;
-        } else it.lab.style.opacity = 0;
-        it.lab.style.visibility = show ? '' : 'hidden';
-        it.lab.classList.toggle('is-on', i === a);
+          c.lab.style.transform = 'translate3d(' + ((sp.x + 1) / 2 * W).toFixed(1) + 'px,' + ((1 - sp.y) / 2 * H).toFixed(1) + 'px,0) scale(' + (.75 + .25 * f).toFixed(3) + ')';
+          c.lab.style.opacity = Math.min(1, (f - .45) * 3) * (match(i) ? 1 : .35);
+        }
+        c.lab.style.visibility = show ? '' : 'hidden';
+        c.lab.classList.toggle('is-on', on);
       });
 
-      if (a !== active) {
-        active = a;
-        showCard(a);
-        card.classList.toggle('is-l', items[a].side > 0);           // на компьютере карточка с другой стороны от объекта
-        card.classList.toggle('is-r', items[a].side < 0);
-        dots.forEach(function (b, k) { b.classList.toggle('is-on', k === a); });
-      }
-      card.classList.toggle('is-hide', pos < -0.45);
+      if (a !== active) { active = a; showCard(a); }
+      card.classList.toggle('is-hide', d < -.3);
+      renderer.render(scene, cam);
     }
+    var raf = 0;
+    function loop() { raf = 0; frame(); if (visible) raf = requestAnimationFrame(loop); }
+    function kick() { if (!raf) raf = requestAnimationFrame(loop); }
 
-    function filter() {
-      items.forEach(function (it, i) {
-        it.tile.classList.toggle('is-dim', !match(i));
-        it.lab.classList.toggle('is-dim', !match(i));
-        dots[i].classList.toggle('is-dim', !match(i));
-      });
+    // нажатие на карточку на сцене открывает объект
+    var ray = new T.Raycaster(), ptr = new T.Vector2();
+    function hit(e) {
+      var r = renderer.domElement.getBoundingClientRect();
+      ptr.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
+      ray.setFromCamera(ptr, cam);
+      var hs = ray.intersectObjects(cards3.map(function (c) { return c.mesh; }), false);
+      return hs.length ? hs[0].object.userData.i : -1;
     }
+    stage.addEventListener('click', function (e) {
+      if (e.target.closest('button,a')) return;
+      var i = hit(e);
+      if (i >= 0) openObj(i);
+    });
+    stage.addEventListener('pointermove', function (e) {
+      if (e.pointerType !== 'mouse') return;
+      glBox.style.cursor = !e.target.closest('button,a') && hit(e) >= 0 ? 'pointer' : '';
+    });
 
-    var queued = false;
-    function kick() { if (!queued) { queued = true; requestAnimationFrame(function () { queued = false; render(); }); } }
-    measure();
-    window.addEventListener('resize', function () { measure(); kick(); });
-    window.addEventListener('load', function () { measure(); kick(); });
-    window.addEventListener('scroll', function () { need = true; kick(); }, { passive: true });
-    // пролёт выше меняет высоту страницы после загрузки кадров - пересчитываем позицию
-    if (window.ResizeObserver) new ResizeObserver(function () { measure(); kick(); }).observe(document.body);
+    api.resize = function () { resize(); kick(); };
+    api.kick = kick;
+    api.filter = function () { kick(); };
+    section.classList.add('is-ready');
     kick();
-    return { go: go, filter: filter };
   }
 })();
