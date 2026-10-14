@@ -6,6 +6,7 @@ import path from 'node:path';
 import { marked } from 'marked';
 import { page, crumbs, esc, footer, ORG_LD, SITE, callBlock } from '../lib/site.js';
 import { OWN, slugify } from '../lib/listings.js';
+import { OBJECTS } from '../lib/objects.js';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const OUT = path.join(ROOT, 'public');
@@ -171,6 +172,32 @@ write('404.html', page({
 
 write('robots.txt', `User-agent: *\nDisallow: /admin\nDisallow: /api/\nAllow: /api/img\n\nSitemap: ${SITE.url}/sitemap.xml\n`);
 
+/* ---------- главная: объекты ---------- */
+// размер маленькой картинки объекта из заголовка webp (VP8 / VP8L / VP8X)
+function objSize(name) {
+  const b = fs.readFileSync(path.join(OUT, 'assets/img/obj', name + '-s.webp'));
+  const t = b.toString('ascii', 12, 16);
+  if (t === 'VP8X') return [1 + b.readUIntLE(24, 3), 1 + b.readUIntLE(27, 3)];
+  if (t === 'VP8L') { const v = b.readUInt32LE(21); return [1 + (v & 0x3fff), 1 + ((v >> 14) & 0x3fff)]; }
+  return [b.readUInt16LE(26) & 0x3fff, b.readUInt16LE(28) & 0x3fff];
+}
+const objPrice = (o) => {
+  const ps = (o.plots || []).filter((p) => p.price && !p.sold).map((p) => p.price);
+  if (o.price) return o.price;
+  if (!ps.length) return 'Цена по запросу';
+  return 'от ' + String(Math.min(...ps) / 1e6).replace('.', ',') + ' млн ₽';
+};
+function objCard(o, i) {
+  const [w, h] = objSize(o.img);
+  return `<article class="oc" data-kind="${o.kind}" data-i="${i}">
+  <button class="oc__img" type="button" data-open="${i}" aria-label="Подробнее: ${esc(o.title)}"><img src="/assets/img/obj/${o.img}-s.webp" alt="${esc(o.title)}, визуализация" loading="lazy" width="${w}" height="${h}"><span>${String(i + 1).padStart(2, '0')}</span></button>
+  <p class="oc__k">${esc(o.type)}${o.road ? ' · ' + esc(o.road) : ''}</p>
+  <h3><button type="button" data-open="${i}">${esc(o.title)}</button></h3>
+  <p class="oc__row"><b>${esc(o.area)}</b><span>${esc(o.status)}</span></p>
+  <p class="oc__p">${esc(objPrice(o))}</p>
+</article>`;
+}
+
 /* ---------- главная: вставки между метками ---------- */
 {
   const f = path.join(OUT, 'index.html');
@@ -181,6 +208,11 @@ write('robots.txt', `User-agent: *\nDisallow: /admin\nDisallow: /api/\nAllow: /a
     s = s.replace(re, `$1\n${content}\n$2`);
   };
   put('blog', posts.slice(0, 3).map(postCard).join('\n'));
+  put('objects', OBJECTS.map(objCard).join('\n'));
+  put('objdata', `<script type="application/json" id="objData">${JSON.stringify(OBJECTS.map((o, i) => {
+    const w = objSize(o.img);
+    return { ...o, n: i + 1, w: w[0], h: w[1], priceT: objPrice(o) };
+  })).replace(/</g, '\\u003c')}</script>`);
   put('foot', footer());
   const faq = [...s.matchAll(/<details class="qa"><summary>([\s\S]*?)<\/summary>([\s\S]*?)<\/details>/g)]
     .map((m) => ({ q: m[1].replace(/<[^>]+>/g, '').trim(), a: m[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() }));

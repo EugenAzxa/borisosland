@@ -26,11 +26,11 @@
       kn: 'К/н 47:07:1047002:3249, 3250',
       points: ['Промназначение', '150 кВт подключены, подстанция на участке', 'Доля 4 сот. в общей дороге в собственность', 'Первый от трассы Кола'] },
     { x: 503, y: 401, w: 219, h: 148, sold: true },
-    { id: 'u2085', x: 733, y: 401, w: 223, h: 148, area: '20,85',
-      title: 'Участок 20,85 сот.', slug: 'murmanskoe-6-km-20-85-sot',
+    { id: 'u2085', x: 733, y: 401, w: 223, h: 148, area: '20,85', price: 11500000,
+      kn: 'К/н 47:07:1047002:3202', title: 'Участок 20,85 сот.', slug: 'murmanskoe-6-km-20-85-sot',
       points: ['Промназначение', 'Подъезд по общей внутренней дороге', 'Выезд на Мурманское шоссе', 'Без управляющей компании'] },
-    { id: 'u265', x: 967, y: 401, w: 191, h: 148, area: '26,5',
-      title: 'Участок 26,5 сот.', slug: 'murmanskoe-6-km-26-5-sot',
+    { id: 'u265', x: 967, y: 401, w: 191, h: 148, area: '26,51', price: 14000000,
+      kn: 'К/н 47:07:1047002:3200', title: 'Участок 26,51 сот.', slug: 'murmanskoe-6-km-26-5-sot',
       points: ['Самый большой из свободных', 'Промназначение', 'Подъезд по общей внутренней дороге', 'Без управляющей компании'] }
   ];
   var FREE = PLOTS.filter(function (p) { return !p.sold; });
@@ -111,7 +111,7 @@
     current = g; g.classList.add('is-on');
     if (p.sold) {
       info.innerHTML = '<p class="eyebrow">Продан</p><h3>Этот участок уже продан</h3>' +
-        '<p>Свободными остались три участка в нижнем ряду: 23,72, 20,85 и 26,5 сотки.</p>' +
+        '<p>Свободными остались три участка в нижнем ряду: 23,72, 20,85 и 26,51 сотки.</p>' +
         '<a class="btn btn--ghost" href="#uchastki">Свободные участки</a>';
       return;
     }
@@ -172,6 +172,48 @@
       if (frames[i + d] && frames[i + d].ok) return frames[i + d].im;
     }
     return null;
+  }
+
+  // метки объектов Инвест 47: видны с высоты, при снижении разлетаются от центра, остаётся посёлок у Колы.
+  // Координаты меток - на кадре 60 (1400 x 791), масштаб местности по кадрам замерен по ширине посёлка
+  var pinsBox = $('#flyPins'), cap = $('#flyCap'), pins = [];
+  var objData = document.getElementById('objData');
+  var ZOOM = [[0, .09], [30, .11], [40, .12], [60, .14], [85, .156], [100, .22], [110, .34], [138, .5]];
+  var PC = [667, 400];                                         // центр приближения - посёлок у Колы
+  function zoomAt(f) {
+    for (var k = 1; k < ZOOM.length; k++) if (f <= ZOOM[k][0]) {
+      var a = ZOOM[k - 1], b = ZOOM[k];
+      return (a[1] + (b[1] - a[1]) * (f - a[0]) / (b[0] - a[0])) / .14;
+    }
+    return ZOOM[ZOOM.length - 1][1] / .14;
+  }
+  if (pinsBox && objData) {
+    JSON.parse(objData.textContent).forEach(function (o, k) {
+      var el = document.createElement('span');
+      el.className = 'fpin' + (k ? '' : ' fpin--main');
+      el.innerHTML = '<b>' + o.label + '</b><i></i>';
+      pinsBox.appendChild(el);
+      pins.push({ el: el, x: o.pin[0], y: o.pin[1], k: k });
+    });
+  }
+  function drawPins(p, L, f) {
+    var a = seg(p, .15, .2) * (1 - seg(p, .37, .43));
+    pinsBox.style.opacity = a;
+    pinsBox.style.visibility = a > 0 ? 'visible' : 'hidden';
+    cap.style.opacity = seg(p, .17, .22) * (1 - seg(p, .35, .4));
+    if (a <= 0) return;
+    var z = zoomAt(f), c = 1;
+    if (portrait()) {                                           // телефон: метки сжимаем по ширине, чтобы все были на экране
+      var mx = 1;
+      pins.forEach(function (q) { mx = Math.max(mx, Math.abs(q.x - PC[0]) * z * L.s); });
+      c = Math.min(1, (W / 2 - 64) / mx);
+    }
+    pins.forEach(function (q) {
+      var sx = L.x + (PC[0] + (q.x - PC[0]) * z) * L.s, sy = L.y + (PC[1] + (q.y - PC[1]) * z) * L.s;
+      sx = W / 2 + (sx - W / 2) * c;
+      q.el.style.transform = 'translate3d(' + sx.toFixed(1) + 'px,' + sy.toFixed(1) + 'px,0)';
+      q.el.style.opacity = seg(p, .15 + q.k * .005, .18 + q.k * .005);
+    });
   }
 
   // слой на земле
@@ -270,6 +312,7 @@
     }
     if (still.complete && (stillA > 0 || !N)) drawImg(still, L, N ? stillA : 1);
     fadeEdges(L, tMove);
+    if (pins.length) drawPins(p, L, fp);
 
     // слой на земле в тех же координатах
     // слой на земле: пока скрыт - не трогаем, размер меняем только когда он изменился
