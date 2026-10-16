@@ -88,7 +88,7 @@
           '<p class="lot__kn">≈ ' + Math.round(p.price / parseFloat(p.area.replace(',', '.')) / 1000) + ' тыс. ₽ за сотку · ' + p.kn + '</p>'
         : '<p class="lot__p ask">Цена по запросу</p>') +
       '<ul>' + p.points.map(function (t) { return '<li>' + t + '</li>'; }).join('') + '</ul>' +
-      '<a class="btn" href="' + phoneHref + '">Позвонить про участок</a>' +
+      '<a class="btn" href="' + phoneHref + '">Позвонить по участку</a>' +
       '<a class="lot__more" href="/vitrina/' + p.slug + '">Подробнее об участке</a>';
     lots.appendChild(el);
   });
@@ -119,7 +119,7 @@
       '<p class="price">' + (p.price ? money(p.price) : 'Цена по запросу') + '</p>' +
       '<p>' + p.points.join(' · ') + '</p>' +
       (p.kn ? '<p style="margin-top:8px">' + p.kn + '</p>' : '') +
-      '<a class="btn" href="' + phoneHref + '">Позвонить про участок</a>';
+      '<a class="btn" href="' + phoneHref + '">Позвонить по участку</a>';
   }
   $('.plan__map').addEventListener('mouseleave', function () {
     if (window.matchMedia('(hover: hover)').matches && current) { current.classList.remove('is-on'); current = null; info.innerHTML = infoDefault; }
@@ -180,10 +180,13 @@
   var objData = document.getElementById('objData');
   if (pinsBox && objData) {
     JSON.parse(objData.textContent).forEach(function (o, k) {
-      var el = document.createElement('span');
-      // на телефоне подписи только у половины меток, остальные - точки, иначе подписи налезают друг на друга
-      el.className = 'fpin' + (k % 2 ? ' fpin--sm' : '');
-      el.innerHTML = '<b>' + o.label + '</b><i></i>';
+      // точка - кнопка: открывает окно объекта (обработчик [data-open] в objects.js)
+      var el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'fpin';
+      el.setAttribute('data-open', k);
+      el.setAttribute('aria-label', 'Объект ' + (k + 1) + ': ' + o.title);
+      el.innerHTML = '<b>' + o.label + '</b><i><u>' + (k + 1) + '</u></i>';
       pinsBox.appendChild(el);
       pins.push({ el: el, x: o.pin[0], y: o.pin[1], k: k });
     });
@@ -200,7 +203,9 @@
       var sx = L.x + q.x * L.s, sy = L.y + q.y * L.s;
       sx = cx + (sx - cx) * c;
       q.el.style.transform = 'translate3d(' + sx.toFixed(1) + 'px,' + sy.toFixed(1) + 'px,0)';
-      q.el.style.opacity = seg(p, .72 + q.k * .007, .75 + q.k * .007);
+      var qa = seg(p, .72 + q.k * .007, .75 + q.k * .007);
+      q.el.style.opacity = qa;
+      q.el.style.pointerEvents = qa > .5 ? 'auto' : 'none';
     });
   }
 

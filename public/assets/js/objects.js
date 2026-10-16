@@ -87,7 +87,7 @@
     kind = b.getAttribute('data-kind');
     chips.querySelectorAll('button').forEach(function (x) { x.classList.toggle('is-on', x === b); });
     applyFilter();
-    if (orb) { for (var i = 0; i < N; i++) if (match(i)) { orb.go(i); break; } }
+    if (orb) { orb.hold(); for (var i = 0; i < N; i++) if (match(i)) { orb.go(i); break; } }
   });
 
   /* ---------- глобус: объекты по кругу вокруг Земли ---------- */
@@ -106,23 +106,26 @@
   var STEP = Math.PI * 2 / N;
   section.style.setProperty('--n', N);
 
-  /* прокрутка -> номер объекта (d), у каждого объекта камера задерживается */
-  var W = 0, H = 0, top0 = 0, span = 1, target = 0, cur = 0;
-  function measure() {
-    W = stage.clientWidth; H = stage.clientHeight;
-    top0 = section.getBoundingClientRect().top + window.scrollY;
-    span = Math.max(1, section.offsetHeight - H);
+  /* слайд-шоу: объекты сменяются сами раз в AUTO мс, стрелками и свайпом. Кольцо бесконечное:
+     target - номер слайда без ограничений, объект на нём - target по модулю N */
+  var AUTO = 5000;
+  var W = 0, H = 0, target = 0, cur = 0, holdUntil = 0;
+  var mod = function (i) { return ((i % N) + N) % N; };
+  function measure() { W = stage.clientWidth; H = stage.clientHeight; }
+  function go(i) {                                              // к объекту i кратчайшим путём по кольцу
+    var base = Math.round(target), dlt = mod(i - mod(base));
+    if (dlt > N / 2) dlt -= N;
+    target = base + dlt;
+    if (api.kick) api.kick();
   }
-  var posOf = function (q) { return -0.15 + q * (N - 0.55); };      // на входе впереди сразу первый объект
-  var qOf = function (i) { return (i + 0.15) / (N - 0.55); };
-  function onScroll() {
-    var q = clamp((window.scrollY - top0) / span, 0, 1), pos = posOf(q), fl = Math.floor(pos);
-    target = fl + sm(sm(pos - fl));
+  function step(s) {
+    var i = mod(Math.round(target));
+    for (var k = 0; k < N; k++) { i = mod(i + s); if (match(i)) break; }
+    go(i);
   }
-  function go(i) { window.scrollTo({ top: top0 + qOf(i) * span + 1, behavior: 'smooth' }); }
+  function hold() { holdUntil = Date.now() + 12000; card.classList.remove('is-auto'); }   // пользователь листает сам - автопрокрутка ждёт
 
   /* карточка объекта */
-  var active = -1;
   function showCard(i) {
     var o = OBJ[i];
     card.innerHTML =
@@ -133,26 +136,39 @@
       '<p class="rc__place">' + esc(o.place) + '</p>' +
       '<p class="rc__row"><b>' + esc(o.area) + '</b><span>' + esc(o.status) + '</span><span class="rc__p">' + esc(o.priceT) + '</span></p>' +
       '<div class="rc__btns"><button class="btn btn--sm" type="button" data-open="' + i + '">Подробнее</button>' +
-      '<a class="btn btn--sm btn--ghost" href="' + tel + '">Позвонить</a></div>';
+      '<a class="btn btn--sm btn--ghost" href="' + tel + '">Позвонить</a></div>' +
+      '<i class="rc__bar" aria-hidden="true"></i>';
     card.classList.remove('is-in'); void card.offsetWidth; card.classList.add('is-in');
+    card.classList.toggle('is-auto', Date.now() > holdUntil);
   }
   card.addEventListener('click', function (e) {
     var b = e.target.closest('[data-step]');
     if (!b) return;
-    var s = +b.getAttribute('data-step'), i = active + s;
-    while (i >= 0 && i < N && !match(i)) i += s;
-    if (i >= 0 && i < N) go(i);
+    hold(); step(+b.getAttribute('data-step'));
   });
 
   var api = { ready: false, filter: function () {} };
-  orb = { go: go, filter: function () { api.filter(); } };
+  orb = { go: go, hold: function () { hold(); }, filter: function () { api.filter(); } };
 
-  measure(); onScroll();
-  window.addEventListener('resize', function () { measure(); onScroll(); if (api.resize) api.resize(); });
-  window.addEventListener('load', function () { measure(); onScroll(); });
-  window.addEventListener('scroll', onScroll, { passive: true });
-  // пролёт выше меняет высоту страницы, пока грузятся кадры
-  if (window.ResizeObserver) new ResizeObserver(function () { measure(); onScroll(); }).observe(document.body);
+  measure();
+  window.addEventListener('resize', function () { measure(); if (api.resize) api.resize(); });
+
+  // автопрокрутка: только когда глобус на экране, вкладка открыта и окно объекта закрыто
+  setInterval(function () {
+    if (!visible || !api.kick || document.hidden || Date.now() < holdUntil || (modal && modal.open)) return;
+    step(1);
+  }, AUTO);
+
+  // свайп по сцене влево-вправо, вертикальная прокрутка страницы остаётся
+  var sx0 = null, sy0 = 0;
+  stage.addEventListener('pointerdown', function (e) { if (e.pointerType !== 'mouse') { sx0 = e.clientX; sy0 = e.clientY; } });
+  stage.addEventListener('pointerup', function (e) {
+    if (sx0 === null) return;
+    var dx = e.clientX - sx0, dy = e.clientY - sy0; sx0 = null;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.3) { hold(); step(dx < 0 ? 1 : -1); swiped = Date.now(); }
+  });
+  stage.addEventListener('pointercancel', function () { sx0 = null; });
+  var swiped = 0;
 
   // three.js готовим заранее, пока телефон простаивает после загрузки страницы, а не в конце пролёта
   // (иначе подготовка сцены подтормаживает последние кадры). Если долистали раньше - сразу.
@@ -169,7 +185,8 @@
     }, 1500);
   }
   if (document.readyState === 'complete') idleStart(); else window.addEventListener('load', idleStart);
-  showCard(0); active = 0;
+  var active = 0;
+  showCard(0);
   new IntersectionObserver(function (en) { visible = en[0].isIntersecting; if (visible && api.kick) api.kick(); }).observe(section);
 
   function build(T) {
@@ -326,13 +343,13 @@
     var need = true, t0 = performance.now(), last = t0;
     function frame() {
       var now = performance.now(), dt = Math.min(.05, (now - last) / 1000); last = now;
-      var k = 1 - Math.pow(.0009, dt);                           // плавное догоняние прокрутки
+      var k = 1 - Math.pow(.012, dt);                            // плавный поворот кольца к следующему объекту
       cur += (target - cur) * k;
       if (Math.abs(target - cur) < 1e-4) cur = target;
       var d = cur, time = (now - t0) / 1000;
-      var a = clamp(Math.round(d), 0, N - 1);
+      var a = mod(Math.round(d));
 
-      globe.rotation.y = spin0 + .32 - clamp((d + .5) / N, 0, 1) * .64 + Math.sin(time * .15) * .03;
+      globe.rotation.y = spin0 + Math.sin(time * .12) * .22;      // Земля медленно покачивается сама
       var pulse = (time * .6) % 1;
       ring.scale.setScalar(.12 + pulse * .55); ring.material.opacity = 1 - pulse;
       dot.scale.setScalar(.3 + Math.sin(time * 3) * .03);
@@ -348,7 +365,7 @@
         c.g.position.set(RING * Math.sin(ang), 0, RING * Math.cos(ang));
         c.g.quaternion.copy(tmpQ);                              // карточка всегда смотрит в камеру
         var f = Math.pow((Math.cos(ang) + 1) / 2, 2.2);          // 1 - спереди, 0 - сзади
-        var on = i === a && Math.abs(d - a) < .35;
+        var on = i === a && Math.abs(d - Math.round(d)) < .35;
         c.g.scale.setScalar(.5 + .62 * f + (on ? .06 : 0));
         var dim = match(i) ? 1 : .22;
         c.mesh.material.color.setScalar((.2 + .8 * f) * dim);
@@ -384,7 +401,6 @@
       });
 
       if (a !== active) { active = a; showCard(a); }
-      card.classList.toggle('is-hide', d < -.3);
       renderer.render(scene, cam);
     }
     var raf = 0;
@@ -401,9 +417,11 @@
       return hs.length ? hs[0].object.userData.i : -1;
     }
     stage.addEventListener('click', function (e) {
-      if (e.target.closest('button,a')) return;
+      if (e.target.closest('button,a') || Date.now() - swiped < 400) return;
       var i = hit(e);
-      if (i >= 0) openObj(i);
+      if (i < 0) return;
+      hold();
+      if (i === active) openObj(i); else go(i);                  // боковой объект сначала выезжает вперёд
     });
     stage.addEventListener('pointermove', function (e) {
       if (e.pointerType !== 'mouse') return;

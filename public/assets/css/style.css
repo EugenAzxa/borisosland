@@ -672,3 +672,34 @@ html.is-modal{overflow:hidden}
 
 /* телефон: в конце пролёта только светящиеся точки объектов, подписи - на глобусе ниже */
 @media (max-width:760px){.fpin b,.fpin i::before{display:none}.fpin i{width:12px;height:12px;left:-6px;top:-6px}}
+
+/* ===== глобус как слайд-шоу: один экран, без привязки к прокрутке ===== */
+.orb,.orb[style]{height:100vh;height:100svh;min-height:600px}
+@media (max-width:760px){.orb{height:100vh;height:100svh;min-height:560px}}
+.orb__stage{touch-action:pan-y}
+.orb__card{overflow:hidden}
+.rc__bar{position:absolute;left:0;bottom:0;height:2px;width:100%;background:var(--lime);transform:scaleX(0);transform-origin:left;opacity:.8}
+.orb__card.is-auto .rc__bar{animation:rcBar 5s linear forwards}
+@keyframes rcBar{to{transform:scaleX(1)}}
+
+/* ===== точки объектов в пролёте - кнопки ===== */
+.fly__pins{pointer-events:none}
+.fpin{pointer-events:auto;cursor:pointer;border:0;background:none;padding:0;color:inherit;font:inherit}
+.fpin i{display:grid;place-items:center}
+.fpin u{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-decoration:none;font:600 9px/1 var(--ff);color:#11150b}
+.fpin:hover b,.fpin:focus-visible b{background:var(--lime);color:#11150b}
+.fpin:focus-visible{outline:none}
+.fpin:focus-visible i{box-shadow:0 0 0 4px var(--lime)}
+@media (max-width:760px){
+  .fpin i{width:22px;height:22px;left:-11px;top:-11px}
+  .fpin u{font-size:10px}
+  .fpin::before{content:"";position:absolute;left:-22px;top:-22px;width:44px;height:44px}
+}
+.fly__cap small{display:block;margin-top:6px;font:500 13px var(--ff);color:rgba(255,255,255,.75)}
+/* сцена глобуса и пролёта не прокручивается браузером при фокусе и нажатиях (overflow:hidden это допускает) */
+.orb__stage,.orb__labels,.fly__stage{overflow:clip}
+@media (min-width:761px){.fpin i{width:18px;height:18px;left:-9px;top:-9px}.fpin u{font-size:9.5px}}
+.fly__card .fly__tip{display:flex;gap:8px;align-items:center;margin-top:12px;font-size:14px;color:var(--lime)}
+.fly__tip i{flex:none;width:10px;height:10px;border-radius:50%;background:var(--lime);box-shadow:0 0 0 4px rgba(207,226,122,.25)}
+@media (max-width:760px) and (max-height:800px), (max-width:370px){.fly__card .fly__tip{margin-top:8px;font-size:13px}}
+.fly__card>p.fly__tip{display:flex}
