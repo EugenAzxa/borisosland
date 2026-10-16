@@ -64,20 +64,6 @@ em{font-style:normal;color:var(--lime)}
 @keyframes fade{to{opacity:1}}
 @keyframes draw{to{stroke-dashoffset:0}}
 
-.fly__land{position:absolute;left:0;top:0;max-width:none;pointer-events:none;overflow:visible;visibility:hidden;will-change:transform}
-.land-roof path{fill:none;stroke:var(--lime);stroke-width:7;stroke-linecap:round;stroke-linejoin:round}
-.land-roof .halo{stroke-width:22;opacity:.18}
-.land-win rect{fill:var(--lime);opacity:0}
-.land-name text{font-family:var(--fd);font-weight:300}
-.draw-t{font-size:62px;letter-spacing:14px;fill:rgba(207,226,122,0);stroke:var(--lime);stroke-width:1.6;paint-order:stroke}
-.land-sub{font-family:var(--ff)!important;font-weight:600!important;font-size:17px;letter-spacing:7px;fill:#fff;opacity:0}
-.land-plots .p rect{stroke-width:3}
-.land-plots .p--free rect{fill:rgba(207,226,122,.32);stroke:var(--lime)}
-.land-plots .p--sold rect{fill:rgba(11,13,9,.55);stroke:rgba(238,240,230,.5)}
-.land-plots text{font-family:var(--ff);text-anchor:middle;fill:#fff}
-.land-plots .t1{font-size:30px;font-weight:700}
-.land-plots .t2{font-size:15px;font-weight:600;letter-spacing:1.5px;fill:rgba(255,255,255,.8)}
-.land-plots .p--sold .t1{font-size:18px;letter-spacing:2px;font-weight:600;fill:rgba(255,255,255,.75)}
 
 .fly__hud{position:absolute;left:clamp(16px,4vw,48px);bottom:clamp(20px,5vh,44px);display:grid;grid-template-columns:auto;gap:2px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.75)}
 .fly__hud b{font-family:var(--fd);font-weight:400;font-size:22px;letter-spacing:0;color:#fff;font-variant-numeric:tabular-nums}
@@ -683,3 +669,6 @@ html.is-modal{overflow:hidden}
   .burger{width:40px;height:40px}
   .top{padding-left:12px;padding-right:12px}
 }
+
+/* телефон: в конце пролёта только светящиеся точки объектов, подписи - на глобусе ниже */
+@media (max-width:760px){.fpin b,.fpin i::before{display:none}.fpin i{width:12px;height:12px;left:-6px;top:-6px}}

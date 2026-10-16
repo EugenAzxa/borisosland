@@ -1,14 +1,14 @@
-/* Инвест 47 - пролёт с неба к участкам, генплан, карточки */
+/* Инвест 47 - пролёт с неба над лесом с точками объектов, генплан, карточки */
 (function () {
   'use strict';
 
   /* ---------- настройки: правки здесь ---------- */
   var CONFIG = {
     film: {
-      d: { dir: 'assets/film/d2/', count: 139, crop: [0, 1] },      // кадры для компьютера, весь кадр 16:9
-      m: { dir: 'assets/film/m5/', count: 90, crop: [.1, .8] }       // телефон: центральные 80% ширины, 720 px
+      d: { dir: 'assets/film/d3/', count: 139, crop: [0, 1] },      // кадры для компьютера, весь кадр 16:9
+      m: { dir: 'assets/film/m6/', count: 90, crop: [.1, .8] }       // телефон: центральные 80% ширины, 720 px
     },
-    still: 'assets/img/plan2.webp' // финальный кадр сверху, в координатах 1400 x 791
+    still: 'assets/img/forest.webp' // финальный кадр: лес с 1500 м, в координатах 1400 x 791 (метки объектов - pin в lib/objects.js)
   };
 
   /* Участки в координатах финального кадра (1400 x 791), раскладка как на плане парка:
@@ -127,7 +127,7 @@
 
   /* ---------- пролёт ---------- */
   var fly = $('#fly'), stage = $('.fly__stage'), cv = $('#flyCv'), ctx = cv.getContext('2d');
-  var intro = $('#flyIntro'), land = $('#flyLand'), card = $('#flyCard'), hint = $('#flyHint');
+  var intro = $('#flyIntro'), card = $('#flyCard'), hint = $('#flyHint');
   var altEl = $('#flyAlt'), bar = $('#flyBar'), hud = $('.fly__hud'), note = $('.fly__note');
   var mobile = window.innerWidth <= 760 && window.innerHeight > window.innerWidth;
   var film = mobile ? CONFIG.film.m : CONFIG.film.d;
@@ -174,66 +174,43 @@
     return null;
   }
 
-  // метки объектов Инвест 47: видны с высоты, при снижении разлетаются от центра, остаётся парк у Колы.
-  // Координаты меток - на кадре 60 (1400 x 791), масштаб местности по кадрам замерен по ширине парка (кадры _src/v2)
+  // метки объектов Инвест 47: загораются над лесом, когда камера закончила снижение.
+  // Координаты - pin в lib/objects.js, на финальном кадре (1400 x 791)
   var pinsBox = $('#flyPins'), cap = $('#flyCap'), pins = [];
   var objData = document.getElementById('objData');
-  var ZOOM = [[0, .05], [25, .094], [45, .125], [60, .154], [85, .2], [100, .286], [115, .39], [138, .56]];
-  var PC = [690, 378];                                         // центр приближения - парк у Колы
-  function zoomAt(f) {
-    for (var k = 1; k < ZOOM.length; k++) if (f <= ZOOM[k][0]) {
-      var a = ZOOM[k - 1], b = ZOOM[k];
-      return (a[1] + (b[1] - a[1]) * (f - a[0]) / (b[0] - a[0])) / .154;
-    }
-    return ZOOM[ZOOM.length - 1][1] / .154;
-  }
   if (pinsBox && objData) {
     JSON.parse(objData.textContent).forEach(function (o, k) {
       var el = document.createElement('span');
       // на телефоне подписи только у половины меток, остальные - точки, иначе подписи налезают друг на друга
-      el.className = 'fpin' + (k ? '' : ' fpin--main') + (k % 2 ? ' fpin--sm' : '');
+      el.className = 'fpin' + (k % 2 ? ' fpin--sm' : '');
       el.innerHTML = '<b>' + o.label + '</b><i></i>';
       pinsBox.appendChild(el);
       pins.push({ el: el, x: o.pin[0], y: o.pin[1], k: k });
     });
   }
-  function drawPins(p, L, f) {
-    var a = seg(p, .15, .2) * (1 - seg(p, .37, .43));
+  function drawPins(p, L) {
+    var a = seg(p, .72, .76);
     pinsBox.style.opacity = a;
     pinsBox.style.visibility = a > 0 ? 'visible' : 'hidden';
-    cap.style.opacity = seg(p, .17, .22) * (1 - seg(p, .35, .4));
+    cap.style.opacity = seg(p, .74, .79) * (1 - seg(p, .86, .9));
     if (a <= 0) return;
-    var z = zoomAt(f), c = 1;
-    if (portrait()) {                                           // телефон: метки сжимаем по ширине, чтобы все были на экране
-      var mx = 1;
-      pins.forEach(function (q) { mx = Math.max(mx, Math.abs(q.x - PC[0]) * z * L.s); });
-      c = Math.min(1, (W / 2 - 24) / mx);
-    }
+    // телефон: кадр показан уже, чем разброс меток, - сжимаем их по ширине к центру (метки условные, не адреса)
+    var c = portrait() ? Math.min(1, (W / 2 - 22) / (414 * L.s)) : 1, cx = L.x + 716 * L.s;
     pins.forEach(function (q) {
-      var sx = L.x + (PC[0] + (q.x - PC[0]) * z) * L.s, sy = L.y + (PC[1] + (q.y - PC[1]) * z) * L.s;
-      sx = W / 2 + (sx - W / 2) * c;
+      var sx = L.x + q.x * L.s, sy = L.y + q.y * L.s;
+      sx = cx + (sx - cx) * c;
       q.el.style.transform = 'translate3d(' + sx.toFixed(1) + 'px,' + sy.toFixed(1) + 'px,0)';
-      q.el.style.opacity = seg(p, .15 + q.k * .005, .18 + q.k * .005);
+      q.el.style.opacity = seg(p, .72 + q.k * .007, .75 + q.k * .007);
     });
   }
 
-  // слой на земле
-  var landPlots = $('#landPlots');
-  var landNodes = PLOTS.map(function (p) { var g = plotNode(p, 'p'); landPlots.appendChild(g); return g; });
-  var roofs = land.querySelectorAll('.land-roof path'), roofLen = roofs[0].getTotalLength();
-  roofs.forEach(function (r) { r.style.strokeDasharray = roofLen; r.style.strokeDashoffset = roofLen; });
-  var wins = land.querySelectorAll('.land-win rect');
-  var nameT = land.querySelector('.draw-t'), sub = land.querySelector('.land-sub');
-  nameT.style.strokeDasharray = '1200 1200'; nameT.style.strokeDashoffset = 1200;
-
-  var W = 0, H = 0, dpr = 0, need = true, P = 0, lastLand = '', flyTop = 0, flySpan = 1;
+  var W = 0, H = 0, dpr = 0, need = true, P = 0, flyTop = 0, flySpan = 1;
   function size() {
     var d = Math.min(window.devicePixelRatio || 1, mobile ? 1.5 : 2);
     var w = stage.clientWidth, h = stage.clientHeight;
     if (w === W && h === H && d === dpr) return;   // адресная строка iOS: размер сцены тот же, canvas не трогаем
     dpr = d; W = w; H = h;
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
-    lastLand = '';
     need = true;
   }
 
@@ -247,9 +224,9 @@
     if (portrait()) {
       // телефон: кадр расширяется во время снижения (масштаб по логарифму, чтобы парк
       // на экране всё время рос), к концу парк целиком по ширине, над карточкой
-      s1 = W / 960;
+      s1 = W / 700;
       var k = Math.pow(s1 / s0, t), sc = s0 * k;
-      var u = ease(seg(P, .88, .95));                             // поднимаем кадр, когда выезжает карточка
+      var u = ease(seg(P, .86, .93));                             // поднимаем кадр, когда выезжает карточка
       var fx = 700 + 16 * t, fy = 395.5 - 12 * t, Y = H / 2 + (H * 0.34 - H / 2) * u;
       return { s: sc, x: W / 2 - fx * sc, y: Y - fy * sc };
     } else {
@@ -296,16 +273,16 @@
     need = false;
     var p = P;
 
-    var tMove = portrait() ? seg(p, .2, .66) : seg(p, .7, .8);
+    var tMove = portrait() ? seg(p, .2, .72) : seg(p, .78, .88);
     var L = layout(tMove);
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = '#0e120c';
     ctx.fillRect(0, 0, W, H);
 
-    var fp = seg(p, 0, .64) * (N - 1);
+    var fp = seg(p, 0, .7) * (N - 1);
     var fi = Math.floor(fp), ff = fp - fi;
-    var stillA = seg(p, .64, .67);
+    var stillA = seg(p, .7, .73);
     if (N && stillA < 1) {
       var a = nearest(fi), b = frames[fi + 1];
       if (a) drawImg(a, L, 1, film.crop); else if (still.complete) drawImg(still, L, 1);
@@ -313,38 +290,10 @@
     }
     if (still.complete && (stillA > 0 || !N)) drawImg(still, L, N ? stillA : 1);
     fadeEdges(L, tMove);
-    if (pins.length) drawPins(p, L, fp);
+    if (pins.length) drawPins(p, L);
 
-    // слой на земле в тех же координатах
-    // слой на земле: пока скрыт - не трогаем, размер меняем только когда он изменился
-    var landA = seg(p, .7, .73);
-    land.style.opacity = landA;
-    land.style.visibility = landA > 0 ? 'visible' : 'hidden';
-    if (landA > 0) {
-      var sz = (1400 * L.s).toFixed(1) + 'x' + (791 * L.s).toFixed(1);
-      if (sz !== lastLand) {
-        lastLand = sz;
-        land.style.width = (1400 * L.s) + 'px';
-        land.style.height = (791 * L.s) + 'px';
-      }
-      land.style.transform = 'translate3d(' + L.x.toFixed(1) + 'px,' + L.y.toFixed(1) + 'px,0)';
-    }
-    hud.style.opacity = 1 - seg(p, .68, .74);
-    note.style.opacity = portrait() ? 1 - seg(p, .68, .74) : 1;
-    var r = seg(p, .74, .84);
-    var ro = (roofLen * (1 - ease(r))).toFixed(1);
-    roofs[0].style.strokeDashoffset = ro; roofs[1].style.strokeDashoffset = ro;
-    var w = seg(p, .82, .85);
-    for (var i = 0; i < wins.length; i++) wins[i].style.opacity = w;
-    var n = seg(p, .76, .88);
-    nameT.style.strokeDashoffset = 1200 * (1 - n);
-    nameT.style.fill = 'rgba(207,226,122,' + (seg(p, .85, .9) * .95) + ')';
-    nameT.style.strokeOpacity = 1 - seg(p, .88, .92) * .6;
-    sub.style.opacity = seg(p, .88, .91);
-    landNodes.forEach(function (g, k) {
-      var a = seg(p, .84 + k * .006, .88 + k * .006);
-      g.style.opacity = a;
-    });
+    hud.style.opacity = 1 - seg(p, .76, .8);
+    note.style.opacity = portrait() ? 1 - seg(p, .76, .8) : 1;
 
     // надпись в облаках: камера пролетает сквозь неё
     var it = seg(p, 0, .12);
@@ -353,8 +302,8 @@
     intro.style.transform = 'scale(' + (1 + it * it * 2.4).toFixed(3) + ')';
     hint.style.opacity = p > .015 ? 0 : 1;
 
-    var altP = seg(p, 0, .64);
-    var alt = Math.round(5000 * Math.pow(250 / 5000, altP) / 10) * 10;
+    var altP = seg(p, 0, .7);
+    var alt = Math.round(5000 * Math.pow(1500 / 5000, altP) / 10) * 10;
     var altT = alt.toLocaleString('ru-RU').replace(/ /g, ' ') + ' м';
     if (altEl.textContent !== altT) altEl.textContent = altT;
     bar.style.transform = 'scaleX(' + p.toFixed(4) + ')';
