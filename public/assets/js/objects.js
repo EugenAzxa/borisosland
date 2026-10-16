@@ -284,19 +284,39 @@
     });
 
     /* раскладка: на компьютере Земля правее (слева карточка), на телефоне выше (внизу карточка) */
-    var visW = 0, visH = 0;
+    var visW = 0, visH = 0, bandTop = 0, bandBot = 1e9, lastW = 0, lastH = 0;
+    var head = $('.orb__head', section);
     function resize() {
+      if (W === lastW && H === lastH) return;                 // адресная строка iOS дёргает resize без изменения размера
+      lastW = W; lastH = H;
       renderer.setSize(W, H, false);
       renderer.domElement.style.width = W + 'px'; renderer.domElement.style.height = H + 'px';
       cam.aspect = W / H;
       var t = Math.tan(cam.fov * Math.PI / 360) * 2;
-      var m = mobile(), needW = m ? 4.6 : 11.8, needH = m ? 8.6 : 6.1;
-      var dist = Math.max(needH / t, needW / (t * cam.aspect));
-      visH = dist * t; visW = visH * cam.aspect;
-      cam.position.set(0, dist * .14, dist);
-      cam.lookAt(0, 0, 0);
-      cam.updateProjectionMatrix();
-      root.position.set(m ? 0 : visW * .17, m ? visH * .12 : -.1, 0);
+      var m = mobile();
+      if (m) {
+        // телефон: Земля с кольцом вписывается в полосу между заголовком и карточкой,
+        // на любой высоте экрана (во встроенном браузере Telegram экран заметно ниже)
+        var sr = stage.getBoundingClientRect();
+        bandTop = head.getBoundingClientRect().bottom - sr.top + 6;
+        bandBot = H - card.offsetHeight - 18;
+        var bandH = Math.max(160, bandBot - bandTop);
+        visH = Math.max(3.55 * H / bandH, 2.1 / cam.aspect);
+        var dist = visH / t;
+        visW = visH * cam.aspect;
+        cam.position.set(0, dist * .14, dist);
+        cam.lookAt(0, 0, 0);
+        cam.updateProjectionMatrix();
+        root.position.set(0, (H / 2 - (bandTop + bandBot) / 2) * visH / H + .02, 0);
+      } else {
+        bandTop = 0; bandBot = 1e9;
+        var dist = Math.max(6.1 / t, 11.8 / (t * cam.aspect));
+        visH = dist * t; visW = visH * cam.aspect;
+        cam.position.set(0, dist * .14, dist);
+        cam.lookAt(0, 0, 0);
+        cam.updateProjectionMatrix();
+        root.position.set(visW * .17, -.1, 0);
+      }
       need = true;
     }
     W = stage.clientWidth; H = stage.clientHeight;
@@ -317,6 +337,7 @@
       ring.scale.setScalar(.12 + pulse * .55); ring.material.opacity = 1 - pulse;
       dot.scale.setScalar(.3 + Math.sin(time * 3) * .03);
 
+      var cardTop = mobile() ? card.offsetTop - 6 : 1e9;       // читаем до записи стилей, без лишних пересчётов
       ringG.updateMatrixWorld();
       ringG.getWorldQuaternion(invRing); invRing.invert();
       tmpQ.copy(invRing).multiply(cam.quaternion);
@@ -352,6 +373,8 @@
         // подпись под карточкой
         sp.set(0, -CH / 2, 0); c.g.localToWorld(sp); sp.project(cam);
         var show = f > .45;
+        var ly = (1 - sp.y) / 2 * H;
+        if (ly < bandTop || ly + 44 > Math.min(bandBot, cardTop)) show = false;   // подпись висит под точкой привязки, высота ~40 px    // подпись не лезет под заголовок и карточку
         if (show) {
           c.lab.style.transform = 'translate3d(' + ((sp.x + 1) / 2 * W).toFixed(1) + 'px,' + ((1 - sp.y) / 2 * H).toFixed(1) + 'px,0) scale(' + (.75 + .25 * f).toFixed(3) + ')';
           c.lab.style.opacity = Math.min(1, (f - .45) * 3) * (match(i) ? 1 : .35);
@@ -387,7 +410,7 @@
       glBox.style.cursor = !e.target.closest('button,a') && hit(e) >= 0 ? 'pointer' : '';
     });
 
-    api.resize = function () { resize(); kick(); };
+    api.resize = function () { W = stage.clientWidth; H = stage.clientHeight; resize(); kick(); };
     api.kick = kick;
     api.filter = function () { kick(); };
     // шейдеры и текстуры отдаём видеокарте сразу, пока глобус не на экране
