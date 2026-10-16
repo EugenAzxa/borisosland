@@ -1,4 +1,4 @@
-# Кадры пролёта из двух видео Higgsfield (_src/v2/v1.mp4 облака -> 1500 м, v2.mp4 1500 м -> посёлок).
+# Кадры пролёта из двух видео Higgsfield (_src/v2/v1.mp4 облака -> 1500 м, v2.mp4 1500 м -> парк).
 # Запуск: uv run --no-project --with imageio-ffmpeg --with pillow python scripts/frames.py
 # Пишет public/assets/film/d2 (компьютер, 1600 px, 139 кадров) и m5 (телефон, центральные 80%, 720 px, 90 кадров); с аргументом m - только телефон,
 # а также public/assets/img/plan2.webp (финальный кадр 1400 x 791).
