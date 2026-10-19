@@ -3,4 +3,4 @@ Disallow: /admin
 Disallow: /api/
 Allow: /api/img
 
-Sitemap: https://invest47.vercel.app/sitemap.xml
+Sitemap: https://xn--4747-f4dst4bzbk.xn--p1ai/sitemap.xml
