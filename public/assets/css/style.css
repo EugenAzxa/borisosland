@@ -703,3 +703,4 @@ html.is-modal{overflow:hidden}
 .fly__tip i{flex:none;width:10px;height:10px;border-radius:50%;background:var(--lime);box-shadow:0 0 0 4px rgba(207,226,122,.25)}
 @media (max-width:760px) and (max-height:800px), (max-width:370px){.fly__card .fly__tip{margin-top:8px;font-size:13px}}
 .fly__card>p.fly__tip{display:flex}
+.foot__adm{color:var(--mute)!important;text-decoration:underline;margin-left:6px;white-space:nowrap}.foot__adm:hover{color:var(--lime)!important}
